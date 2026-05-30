@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { IPaginadoUsuario, IRespostaUsuario } from "@/types/usuario";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarTudo(
   access_token: string,
@@ -12,7 +13,7 @@ export async function buscarTudo(
   permissao: string = "",
   grupoAtivoId?: string,
 ): Promise<IRespostaUsuario> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const query = new URLSearchParams({
       pagina: String(pagina),

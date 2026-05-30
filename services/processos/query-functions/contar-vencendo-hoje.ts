@@ -1,6 +1,7 @@
-/** @format */
+﻿/** @format */
 
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function contarVencendoHoje(
   access_token: string,
@@ -11,7 +12,7 @@ export async function contarVencendoHoje(
   data: number | null;
   status: number;
 }> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const response = await fetch(`${baseURL}processos/contar/vencendo-hoje`, {
       method: "GET",

@@ -1,7 +1,8 @@
-"use server";
+﻿"use server";
 
 import { IInteressado } from "@/types/interessado";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function listaCompleta(
   token: string,

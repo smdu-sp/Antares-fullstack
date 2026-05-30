@@ -1,10 +1,12 @@
-/** @format */
+﻿/** @format */
 
 import {
+import { getApiUrl } from "@/lib/http/get-api-url";
   ICoordenadoriaApiResponse,
   ICoordenadoriaContexto,
 } from "@/types/coordenadoria";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarContexto(
   access_token: string,

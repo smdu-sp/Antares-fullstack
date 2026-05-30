@@ -1,4 +1,4 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
@@ -6,13 +6,15 @@ import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { IRespostaUsuario } from "@/types/usuario";
 import { revalidateTag } from "next/cache";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 import { redirect } from "next/navigation";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function autorizar(id: string): Promise<IRespostaUsuario> {
   const session = await auth();
   if (!session) redirect("/login");
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   const autorizado = await fetch(`${baseURL}usuarios/autorizar/${id}`, {
     method: "PATCH",
     headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),

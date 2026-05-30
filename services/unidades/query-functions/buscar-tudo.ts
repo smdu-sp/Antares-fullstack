@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { IPaginadoUnidade, IRespostaUnidade } from "@/types/unidade";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarTudo(
   access_token: string,
@@ -10,7 +11,7 @@ export async function buscarTudo(
   busca: string = "",
   grupoAtivoId?: string,
 ): Promise<IRespostaUnidade> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const unidades = await fetch(
       `${baseURL}unidades?pagina=${pagina}&limite=${limite}&busca=${busca}`,

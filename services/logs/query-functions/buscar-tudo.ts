@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { IPaginadoLog } from "@/types/log";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarTudo(
   token: string,

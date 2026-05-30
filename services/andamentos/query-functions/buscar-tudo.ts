@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { IAndamento, IRespostaAndamento } from "@/types/processo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarTudo(
   access_token: string,
@@ -9,7 +10,7 @@ export async function buscarTudo(
   limite: number = 100,
   grupoAtivoId?: string,
 ): Promise<IRespostaAndamento> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   const response = await fetch(
     `${baseURL}andamentos?pagina=${pagina}&limite=${limite}`,

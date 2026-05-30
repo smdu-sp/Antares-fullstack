@@ -1,10 +1,11 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL;
 

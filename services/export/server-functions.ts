@@ -1,10 +1,11 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export interface ExportParams {
   ids?: string[];
@@ -20,7 +21,7 @@ export interface ExportParams {
 
 export async function exportarProcessosExcel(params: ExportParams) {
   const session = await auth();
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   if (!session) redirect("/login");
 
@@ -59,7 +60,7 @@ export async function exportarProcessosExcel(params: ExportParams) {
 
 export async function exportarProcessosPdf(params: ExportParams) {
   const session = await auth();
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   if (!session) redirect("/login");
 
@@ -98,7 +99,7 @@ export async function exportarProcessosPdf(params: ExportParams) {
 
 export async function exportarAndamentosExcel(params: ExportParams) {
   const session = await auth();
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   if (!session) redirect("/login");
 
@@ -137,7 +138,7 @@ export async function exportarAndamentosExcel(params: ExportParams) {
 
 export async function exportarAndamentosPdf(params: ExportParams) {
   const session = await auth();
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   if (!session) redirect("/login");
 

@@ -1,13 +1,14 @@
-/** @format */
+﻿/** @format */
 
 import { IRespostaUnidade, IUnidade } from "@/types/unidade";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function listaCompleta(
   access_token: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaUnidade> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const unidades = await fetch(`${baseURL}unidades/lista-completa`, {
       method: "GET",

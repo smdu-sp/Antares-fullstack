@@ -1,8 +1,9 @@
-"use server";
+﻿"use server";
 
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import type {
+import { getApiUrl } from "@/lib/http/get-api-url";
   IPreferencia,
   CriarPreferenciaDTO,
   AtualizarPreferenciaDTO,

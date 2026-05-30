@@ -1,13 +1,14 @@
-/** @format */
+﻿/** @format */
 
 import { IRespostaUsuario, IUsuarioTecnico } from "@/types/usuario";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarTecnicos(
   access_token: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaUsuario> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const usuarioNovo = await fetch(`${baseURL}usuarios/buscar-tecnicos`, {
       method: "GET",

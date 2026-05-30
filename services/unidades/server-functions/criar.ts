@@ -1,4 +1,4 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
@@ -7,10 +7,11 @@ import { ICreateUnidade, IRespostaUnidade, IUnidade } from "@/types/unidade";
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function criar(data: ICreateUnidade): Promise<IRespostaUnidade> {
   const session = await auth();
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   if (!session) redirect("/login");
 
   const response: Response = await fetch(`${baseURL}unidades`, {

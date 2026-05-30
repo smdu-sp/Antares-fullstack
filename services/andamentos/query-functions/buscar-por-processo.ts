@@ -1,14 +1,15 @@
-/** @format */
+﻿/** @format */
 
 import { IAndamento, IRespostaAndamento } from "@/types/processo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarPorProcesso(
   access_token: string,
   processo_id: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaAndamento> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const andamentos = await fetch(
       `${baseURL}andamentos/processo/${processo_id}`,

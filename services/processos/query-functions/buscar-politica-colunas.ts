@@ -1,16 +1,18 @@
-/** @format */
+﻿/** @format */
 
 import {
+import { getApiUrl } from "@/lib/http/get-api-url";
   IPoliticaColunasProcesso,
   IRespostaPoliticaColunasProcesso,
 } from "@/types/processo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarPoliticaColunas(
   access_token: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaPoliticaColunasProcesso> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   try {
     const response = await fetch(`${baseURL}processos/colunas/politica`, {

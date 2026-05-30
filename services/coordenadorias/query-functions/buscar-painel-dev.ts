@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { ICoordenadoriaApiResponse } from "@/types/coordenadoria";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 type AdminListItem = Record<string, unknown>;
 

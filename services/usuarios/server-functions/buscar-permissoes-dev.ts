@@ -1,10 +1,11 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { redirect } from "next/navigation";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export type UsuarioPermissaoDev = {
   id: string;
@@ -26,7 +27,7 @@ export async function buscarPermissoesDev(): Promise<{
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   try {
     const response = await fetch(`${baseURL}usuarios/admin/dev/permissoes`, {

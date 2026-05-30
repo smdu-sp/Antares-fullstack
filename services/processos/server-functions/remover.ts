@@ -1,4 +1,4 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
@@ -7,10 +7,11 @@ import { IRespostaProcesso } from "@/types/processo";
 import { auth } from "@/lib/auth/auth";
 import { revalidateTag } from "next/cache";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function remover(id: string): Promise<IRespostaProcesso> {
   const session = await auth();
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   if (!session) redirect("/login");
 
   const response: Response = await fetch(`${baseURL}processos/${id}`, {

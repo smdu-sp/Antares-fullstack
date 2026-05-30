@@ -1,14 +1,15 @@
-/** @format */
+﻿/** @format */
 
 import { IRespostaUnidade, IUnidade } from "@/types/unidade";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarPorId(
   access_token: string,
   id: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaUnidade> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const unidade = await fetch(`${baseURL}unidades/${id}`, {
       method: "GET",

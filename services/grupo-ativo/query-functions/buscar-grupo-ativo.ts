@@ -1,12 +1,13 @@
-/** @format */
+﻿/** @format */
 
 import { IGrupoAtivo, IRespostaGrupoAtivo } from "@/types/grupo-ativo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarGrupoAtivo(
   access_token: string,
 ): Promise<IRespostaGrupoAtivo<IGrupoAtivo>> {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   try {
     const response = await fetch(`${baseURL}grupo-ativo`, {

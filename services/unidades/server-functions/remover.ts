@@ -1,4 +1,4 @@
-/** @format */
+﻿/** @format */
 
 "use server";
 
@@ -7,11 +7,12 @@ import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { IRespostaUnidade } from "@/types/unidade";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function remover(id: string): Promise<IRespostaUnidade> {
   const session = await auth();
   if (!session) redirect("/login");
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
 
   try {
     const response: Response = await fetch(`${baseURL}unidades/${id}`, {

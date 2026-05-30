@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { IRespostaUsuario, IUsuario } from "@/types/usuario";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 export async function buscarMeuUsuario(
   access_token: string,
@@ -14,7 +15,7 @@ export async function buscarMeuUsuario(
       data: null,
       status: 400,
     };
-  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+  const baseURL = getApiUrl();
   try {
     const usuarios = await fetch(`${baseURL}usuario-atual`, {
       method: "GET",

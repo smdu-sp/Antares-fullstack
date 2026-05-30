@@ -1,7 +1,8 @@
-/** @format */
+﻿/** @format */
 
 import { IUnidade } from "@/types/unidade";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL;
 
