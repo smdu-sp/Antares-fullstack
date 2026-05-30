@@ -35,7 +35,7 @@ async function executarCrud(
 ): Promise<RespostaCrudDev> {
   const session = await auth();
   const baseURL = (
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+    getApiUrl()
   ).replace(/\/$/, "");
 
   if (!session?.access_token) {

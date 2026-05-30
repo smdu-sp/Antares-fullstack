@@ -12,7 +12,7 @@ export async function deletarMapeamento(
 ): Promise<{ ok: boolean; error: string | null; status: number }> {
   const session = await auth();
   const baseURL = (
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+    getApiUrl()
   ).replace(/\/$/, "");
 
   if (!session?.access_token) {

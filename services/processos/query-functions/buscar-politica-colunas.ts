@@ -1,7 +1,6 @@
 ﻿/** @format */
 
 import {
-import { getApiUrl } from "@/lib/http/get-api-url";
   IPoliticaColunasProcesso,
   IRespostaPoliticaColunasProcesso,
 } from "@/types/processo";

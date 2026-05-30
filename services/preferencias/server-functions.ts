@@ -3,16 +3,13 @@
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import type {
-import { getApiUrl } from "@/lib/http/get-api-url";
   IPreferencia,
   CriarPreferenciaDTO,
   AtualizarPreferenciaDTO,
 } from "@/types/preferencia";
+import { getApiUrl } from "@/lib/http/get-api-url";
 
-// Remover barra final se existir
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
-).replace(/\/$/, "");
+const API_URL = getApiUrl().replace(/\/$/, "");
 
 /**
  * Buscar uma preferência específica por chave

@@ -4,7 +4,6 @@
 
 import { redirect } from "next/navigation";
 import {
-import { getApiUrl } from "@/lib/http/get-api-url";
   ICreateAndamento,
   IRespostaAndamento,
   IAndamento,

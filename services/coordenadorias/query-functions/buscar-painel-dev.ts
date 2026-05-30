@@ -13,7 +13,7 @@ async function buscarListaAdmin(
   fallbackError: string,
 ): Promise<ICoordenadoriaApiResponse<AdminListItem[]>> {
   const baseURL = (
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+    getApiUrl()
   ).replace(/\/$/, "");
 
   try {

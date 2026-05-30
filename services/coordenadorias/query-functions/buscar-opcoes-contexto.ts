@@ -1,7 +1,6 @@
 ﻿/** @format */
 
 import {
-import { getApiUrl } from "@/lib/http/get-api-url";
   ICoordenadoriaApiResponse,
   IOpcaoContexto,
 } from "@/types/coordenadoria";
@@ -13,7 +12,7 @@ export async function buscarOpcoesContexto(
   grupoAtivoId?: string,
 ): Promise<ICoordenadoriaApiResponse<IOpcaoContexto[]>> {
   const baseURL = (
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+    getApiUrl()
   ).replace(/\/$/, "");
 
   try {

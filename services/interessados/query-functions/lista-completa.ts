@@ -9,7 +9,7 @@ export async function listaCompleta(
   grupoAtivoId?: string,
 ): Promise<IInteressado[]> {
   try {
-    const url = `${process.env.NEXT_PUBLIC_API_URL}interessados/lista-completa`;
+    const url = `${getApiUrl()}interessados/lista-completa`;
     const response = await fetch(url, {
       method: "GET",
       headers: buildAuthHeaders(token, grupoAtivoId),

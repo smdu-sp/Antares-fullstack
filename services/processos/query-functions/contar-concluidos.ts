@@ -9,7 +9,7 @@ export async function contarConcluidos(
 ): Promise<{ ok: boolean; data: number | null; error: string | null }> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}processos/contar/concluidos`,
+      `${getApiUrl()}processos/contar/concluidos`,
       {
         headers: buildAuthHeaders(token, grupoAtivoId),
         cache: "no-store",

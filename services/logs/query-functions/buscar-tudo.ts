@@ -33,7 +33,7 @@ export async function buscarTudo(
     if (dataFim) params.append("dataFim", dataFim);
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}logs?${params.toString()}`,
+      `${getApiUrl()}logs?${params.toString()}`,
       {
         method: "GET",
         headers: buildAuthHeaders(token, grupoAtivoId),

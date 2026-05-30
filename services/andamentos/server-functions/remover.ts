@@ -22,7 +22,7 @@ export async function remover(id: string): Promise<{
 
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}andamentos/${id}`,
+      `${getApiUrl()}andamentos/${id}`,
       {
         method: "DELETE",
         headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),
