@@ -15,6 +15,9 @@ export async function buscarTudo(
   grupoAtivoId?: string,
   interessado?: string,
   concluidos?: boolean,
+  // Permite cache curto para chamadas que não dependem da busca do usuário
+  // (ex.: total geral do dashboard). A busca do usuário deve sempre usar no-store.
+  permitirCache: boolean = false,
 ): Promise<IRespostaProcesso> {
   const baseURL = getApiUrl();
   try {
@@ -33,7 +36,9 @@ export async function buscarTudo(
     const processos = await fetch(`${baseURL}processos?${params.toString()}`, {
       method: "GET",
       headers: buildAuthHeaders(access_token, grupoAtivoId),
-      next: { tags: ["processos"], revalidate: 120 },
+      ...(permitirCache
+        ? { next: { tags: ["processos"], revalidate: 60 } }
+        : { cache: "no-store" as const }),
     });
     const data = await processos.json();
     if (processos.status === 200)

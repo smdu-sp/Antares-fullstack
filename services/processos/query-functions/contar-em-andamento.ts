@@ -12,7 +12,7 @@ export async function contarEmAndamento(
       `${getApiUrl()}processos/contar/em-andamento`,
       {
         headers: buildAuthHeaders(token, grupoAtivoId),
-        cache: "no-store",
+        next: { tags: ["processos"], revalidate: 60 },
       },
     );
 

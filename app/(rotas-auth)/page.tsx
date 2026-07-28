@@ -5,17 +5,12 @@ import Pagination from "@/components/pagination";
 import { auth } from "@/lib/auth/auth";
 import * as processo from "@/services/processos";
 import * as unidade from "@/services/unidades";
-import * as interessado from "@/services/interessados";
-import * as andamento from "@/services/andamentos";
 import {
   IPaginadoProcesso,
   IProcesso,
-  IAndamento,
-  StatusAndamento,
   IPoliticaColunasProcesso,
 } from "@/types/processo";
 import { IUnidade } from "@/types/unidade";
-import { IInteressado } from "@/types/interessado";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import FiltroVencendoHoje from "./processos/_components/filtro-vencendo-hoje";
@@ -25,7 +20,6 @@ import { ProcessosGrid } from "./_components/processos-grid";
 import { BtnLimparFiltros } from "@/components/btn-limpar-filtros";
 import MetricsToggle from "./_components/metrics-toggle";
 import { AlertCircle } from "lucide-react";
-import { parseUTCDate } from "@/app/(rotas-auth)/processos/_components/utils";
 
 function normalizarCampoColuna(coluna: string): string {
   if (coluna === "usuario_atribuido_id") return "usuario_atribuido_nome";
@@ -133,16 +127,6 @@ async function Home({
     : concluidos;
   let dados: IProcesso[] = [];
   let unidadesLista: IUnidade[] = [];
-  let interessadosLista: IInteressado[] = [];
-  let totalVencendoHoje = 0;
-  let totalAtrasados = 0;
-  let totalProcessos = 0;
-  let totalConcluidos = 0;
-  let totalEmAndamento = 0;
-  let andamentosEmAndamento = 0;
-  let andamentosVencidos = 0;
-  let andamentosVencendoHoje = 0;
-  let andamentosConcluidos = 0;
   let colunasProcessosConfig: string[] = [];
   let chavePreferenciaOrdem: string | undefined;
   let exibirAtribuicaoUsuario = false;
@@ -223,98 +207,21 @@ async function Home({
         }
       }
 
-      const [unidadesResponse, interessadosResult] = await Promise.all([
-        unidade.listaCompleta(session.access_token),
-        interessado.query.listaCompleta(session.access_token),
-      ]);
+      const unidadesResponse = await unidade.listaCompleta(
+        session.access_token,
+      );
 
       if (unidadesResponse.ok && unidadesResponse.data) {
         unidadesLista = unidadesResponse.data as IUnidade[];
       }
 
-      if (interessadosResult && Array.isArray(interessadosResult)) {
-        interessadosLista = interessadosResult;
-      }
+      // A lista completa de interessados (pode ser um payload grande) é
+      // carregada sob demanda pelo próprio ProcessosSpreadsheet no cliente,
+      // não aqui — evita pesar toda busca com esse fetch.
 
-      // Buscar total geral (sem filtros) para o dashboard
-      const totalGeralResponse = await processo.query.buscarTudo(
-        session.access_token,
-        1,
-        1, // Busca apenas 1 item, só precisamos do total
-        "", // Sem busca
-        false, // Sem filtro vencendo hoje
-        false, // Sem filtro atrasados
-        undefined,
-        grupoAtivoId,
-      );
-
-      if (totalGeralResponse.ok && totalGeralResponse.data) {
-        totalProcessos =
-          (totalGeralResponse.data as IPaginadoProcesso).total || 0;
-      }
-
-      // Buscar métricas específicas
-      const [vencendoHojeRes, atrasadosRes, concluidosRes, emAndamentoRes] =
-        await Promise.all([
-          processo.query.contarVencendoHoje(session.access_token, grupoAtivoId),
-          processo.query.contarAtrasados(session.access_token, grupoAtivoId),
-          processo.query.contarConcluidos(session.access_token, grupoAtivoId),
-          processo.query.contarEmAndamento(session.access_token, grupoAtivoId),
-        ]);
-
-      if (vencendoHojeRes.ok && vencendoHojeRes.data !== null) {
-        totalVencendoHoje = vencendoHojeRes.data;
-      }
-      if (atrasadosRes.ok && atrasadosRes.data !== null) {
-        totalAtrasados = atrasadosRes.data;
-      }
-      if (concluidosRes.ok && concluidosRes.data !== null) {
-        totalConcluidos = concluidosRes.data;
-      }
-      if (emAndamentoRes.ok && emAndamentoRes.data !== null) {
-        totalEmAndamento = emAndamentoRes.data;
-      }
-
-      // Buscar andamentos para calcular métricas
-      // Nota: Busca um limite alto para pegar todos os andamentos disponíveis
-      // Idealmente, o backend deveria ter endpoints específicos de contagem como tem para processos
-      const andamentosResponse = await andamento.query.buscarTudo(
-        session.access_token,
-        1,
-        999999,
-        grupoAtivoId,
-      );
-
-      if (andamentosResponse.ok && andamentosResponse.data) {
-        const andamentosPaginados = andamentosResponse.data as any;
-        const andamentosLista = (andamentosPaginados.data || []).filter(
-          (a: IAndamento) => a.ativo === true, // Filtrar apenas andamentos ativos
-        );
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-
-        andamentosLista.forEach((a: IAndamento) => {
-          if (a.status === StatusAndamento.CONCLUIDO) {
-            andamentosConcluidos++;
-          } else {
-            const prazo = parseUTCDate(a.prazo);
-            if (!prazo) {
-              andamentosEmAndamento++;
-            } else {
-              const diffDays = Math.ceil(
-                (prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
-              );
-              if (diffDays < 0) {
-                andamentosVencidos++;
-              } else if (diffDays === 0) {
-                andamentosVencendoHoje++;
-              } else {
-                andamentosEmAndamento++;
-              }
-            }
-          }
-        });
-      }
+      // Métricas do dashboard (totais, vencendo hoje, atrasados, andamentos etc.)
+      // são carregadas sob demanda pelo MetricsToggle (painel "Mostrar Resumo"),
+      // não aqui — evita pesar toda busca com a leitura completa de andamentos.
     }
   }
 
@@ -347,21 +254,8 @@ async function Home({
 
         {!grupoAtivoInvalido && (
           <>
-            {/* Métricas com Toggle */}
-            <MetricsToggle
-              processos={{
-                total: totalProcessos,
-                vencendoHoje: totalVencendoHoje,
-                atrasados: totalAtrasados,
-                emAndamento: totalEmAndamento,
-              }}
-              andamentos={{
-                emAndamento: andamentosEmAndamento,
-                vencidos: andamentosVencidos,
-                vencendoHoje: andamentosVencendoHoje,
-                concluidos: andamentosConcluidos,
-              }}
-            />
+            {/* Métricas com Toggle (carregadas sob demanda ao abrir o painel) */}
+            <MetricsToggle />
 
             <div className="flex flex-col gap-2 my-3 sm:gap-4 sm:my-5 w-full min-w-0">
               {/* Barra de Busca com Auto-Search */}
@@ -413,7 +307,6 @@ async function Home({
             <ProcessosGrid
               processos={dados}
               unidades={unidadesLista}
-              interessados={interessadosLista}
               colunasProcessos={colunasProcessosConfig}
               chavePreferenciaOrdem={chavePreferenciaOrdem}
               exibirAtribuicaoUsuario={exibirAtribuicaoUsuario}

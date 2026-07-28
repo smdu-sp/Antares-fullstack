@@ -8,6 +8,8 @@ import {
   useRef,
   useState,
   useEffect,
+  useContext,
+  createContext,
   forwardRef,
   useImperativeHandle,
 } from "react";
@@ -48,6 +50,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import DateCellEditor from "@/components/date-cell-editor";
 import ModalDeleteProcesso from "@/app/(rotas-auth)/processos/_components/modal-delete-processo";
@@ -64,6 +67,33 @@ const COLUNAS_FIXAS_UI = ["checkbox", "expand", "acoes"];
 
 // Registrar todos os módulos da comunidade AG-Grid
 ModuleRegistry.registerModules([AllCommunityModule]);
+
+// Contexto para permitir que o headerComponent do AG-Grid (renderizado via portal)
+// reaja a mudanças de estado do componente pai sem depender de api.refreshHeader().
+const ExpandirTudoContext = createContext<{
+  allExpanded: boolean;
+  toggleAll: () => void;
+} | null>(null);
+
+function ExpandirTudoHeader() {
+  const ctx = useContext(ExpandirTudoContext);
+  if (!ctx) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={ctx.toggleAll}
+      className="flex items-center justify-center w-full h-full hover:bg-gray-100 transition-colors"
+      title={ctx.allExpanded ? "Recolher tudo" : "Expandir tudo"}
+    >
+      {ctx.allExpanded ? (
+        <ChevronDown className="h-4 w-4" />
+      ) : (
+        <ChevronRight className="h-4 w-4" />
+      )}
+    </button>
+  );
+}
 
 // Componente para mostrar andamentos como detalhe expansível
 function AndamentosDetail({
@@ -83,6 +113,20 @@ function AndamentosDetail({
   const [isEditingAssunto, setIsEditingAssunto] = useState(false);
   const [novoAssunto, setNovoAssunto] = useState(processo.assunto);
   const [isSavingAssunto, setIsSavingAssunto] = useState(false);
+  const [isEditingInteressado, setIsEditingInteressado] = useState(false);
+  const [inputInteressado, setInputInteressado] = useState(
+    processo.interessado || "",
+  );
+  const [selectedInteressadoId, setSelectedInteressadoId] = useState(
+    processo.interessado_id || "",
+  );
+  const [isSavingInteressado, setIsSavingInteressado] = useState(false);
+  const [suggestionsInteressado, setSuggestionsInteressado] = useState<
+    IInteressado[]
+  >([]);
+  const [showSuggestionsInteressado, setShowSuggestionsInteressado] =
+    useState(false);
+  const timeoutRefInteressado = useRef<NodeJS.Timeout | null>(null);
   const gridRef = useRef<AgGridReact>(null);
   const router = useRouter();
   const savingRef = useRef<Set<string>>(new Set()); // Prevenir salvamentos duplicados
@@ -174,6 +218,106 @@ function AndamentosDetail({
   const handleCancelEdit = () => {
     setNovoAssunto(processo.assunto);
     setIsEditingAssunto(false);
+  };
+
+  const fetchSuggestionsInteressado = (q: string) => {
+    if (!q || q.length < 1) {
+      setSuggestionsInteressado(interessados);
+      return;
+    }
+    const filtrados = interessados.filter((i) =>
+      i.valor.toLowerCase().includes(q.toLowerCase()),
+    );
+    setSuggestionsInteressado(filtrados);
+  };
+
+  const handleChangeInteressado = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputInteressado(value);
+    setSelectedInteressadoId("");
+    if (timeoutRefInteressado.current) {
+      clearTimeout(timeoutRefInteressado.current);
+    }
+    timeoutRefInteressado.current = setTimeout(() => {
+      fetchSuggestionsInteressado(value);
+      setShowSuggestionsInteressado(true);
+    }, 250);
+  };
+
+  const handleSelectInteressado = (inter: IInteressado) => {
+    setInputInteressado(inter.valor);
+    setSelectedInteressadoId(inter.id);
+    setShowSuggestionsInteressado(false);
+    setSuggestionsInteressado([]);
+  };
+
+  const handleCancelEditInteressado = () => {
+    setInputInteressado(processo.interessado || "");
+    setSelectedInteressadoId(processo.interessado_id || "");
+    setIsEditingInteressado(false);
+    setShowSuggestionsInteressado(false);
+  };
+
+  const handleSaveInteressado = async () => {
+    const valorDigitado = inputInteressado.trim();
+
+    if (
+      valorDigitado === (processo.interessado || "") &&
+      selectedInteressadoId === (processo.interessado_id || "")
+    ) {
+      setIsEditingInteressado(false);
+      return;
+    }
+
+    setIsSavingInteressado(true);
+    try {
+      let interessadoIdFinal = selectedInteressadoId;
+
+      // Se não há um interessado selecionado mas há texto digitado,
+      // tenta encontrar um existente com o mesmo nome ou cria um novo
+      if (!interessadoIdFinal && valorDigitado) {
+        const existente = interessados.find(
+          (i) => i.valor.toLowerCase() === valorDigitado.toLowerCase(),
+        );
+        if (existente) {
+          interessadoIdFinal = existente.id;
+        } else {
+          const respostaInteressado = await interessadoService.server.criar({
+            valor: valorDigitado,
+          });
+          if (respostaInteressado.ok && respostaInteressado.data) {
+            interessadoIdFinal = respostaInteressado.data.id;
+            toast.success("Novo interessado criado");
+          } else {
+            toast.error("Erro ao criar interessado", {
+              description: respostaInteressado.error,
+            });
+            setIsSavingInteressado(false);
+            return;
+          }
+        }
+      }
+
+      const response = await processoService.server.atualizar(processo.id, {
+        interessado_id: interessadoIdFinal || null,
+      });
+
+      if (response.ok) {
+        toast.success("Interessado atualizado com sucesso");
+        setIsEditingInteressado(false);
+        router.refresh();
+      } else {
+        toast.error("Erro ao atualizar interessado", {
+          description: response.error,
+        });
+        handleCancelEditInteressado();
+      }
+    } catch (error) {
+      toast.error("Erro ao atualizar interessado");
+      handleCancelEditInteressado();
+    } finally {
+      setIsSavingInteressado(false);
+    }
   };
 
   const onCellValueChanged = useCallback(
@@ -637,6 +781,89 @@ function AndamentosDetail({
         </Button>
       </div>
 
+      {/* Interessado do Processo */}
+      <div className="relative mb-4 p-3 rounded-md bg-opacity-50 bg-gradient-to-r from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900">
+        <p className="text-xs font-medium text-muted-foreground mb-1">
+          Interessado do Processo:
+        </p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0 relative">
+            {isEditingInteressado ? (
+              <>
+                <Input
+                  value={inputInteressado}
+                  onChange={handleChangeInteressado}
+                  placeholder="Busque pelo nome do interessado..."
+                  className="text-sm font-medium"
+                  autoComplete="off"
+                  autoFocus
+                  onFocus={() => {
+                    fetchSuggestionsInteressado(inputInteressado);
+                    setShowSuggestionsInteressado(true);
+                  }}
+                  onBlur={() =>
+                    setTimeout(
+                      () => setShowSuggestionsInteressado(false),
+                      200,
+                    )
+                  }
+                />
+                {showSuggestionsInteressado &&
+                  suggestionsInteressado.length > 0 && (
+                    <ul className="absolute z-10 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-md mt-1 w-full max-h-48 overflow-auto shadow-lg">
+                      {suggestionsInteressado.map((inter) => (
+                        <li
+                          key={inter.id}
+                          className="px-3 py-2 cursor-pointer text-sm hover:bg-gray-100 dark:hover:bg-zinc-800"
+                          onMouseDown={() => handleSelectInteressado(inter)}
+                        >
+                          {inter.valor}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </>
+            ) : (
+              <p className="text-sm whitespace-pre-wrap break-words font-medium">
+                {processo.interessado || "Nenhum interessado definido"}
+              </p>
+            )}
+          </div>
+          {!isEditingInteressado && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsEditingInteressado(true)}
+              className="flex-shrink-0"
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {isEditingInteressado && (
+          <div className="flex gap-2 justify-end mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancelEditInteressado}
+              disabled={isSavingInteressado}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveInteressado}
+              disabled={isSavingInteressado}
+            >
+              <Check className="h-4 w-4 mr-1" />
+              {isSavingInteressado ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Assunto do Processo */}
       <div className="mb-4 p-3 rounded-md bg-opacity-50 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
         <p className="text-xs font-medium text-muted-foreground mb-1">
@@ -748,7 +975,6 @@ function AndamentosDetail({
 interface ProcessosSpreadsheetProps {
   processos: IProcesso[];
   unidades: IUnidade[];
-  interessados: IInteressado[];
   colunasProcessos?: string[];
   chavePreferenciaOrdem?: string;
   exibirAtribuicaoUsuario?: boolean;
@@ -763,7 +989,6 @@ interface ProcessosSpreadsheetProps {
 export default function ProcessosSpreadsheet({
   processos,
   unidades,
-  interessados,
   colunasProcessos = [],
   chavePreferenciaOrdem,
   exibirAtribuicaoUsuario = false,
@@ -784,13 +1009,17 @@ export default function ProcessosSpreadsheet({
   const [usuariosResponsaveis, setUsuariosResponsaveis] = useState<
     IUsuarioTecnico[]
   >([]);
+  const [interessados, setInteressados] = useState<IInteressado[]>([]);
   const chavePreferencia = useMemo(() => {
     const chave = (chavePreferenciaOrdem || "").trim();
     return chave || "processos-colunas-ordem";
   }, [chavePreferenciaOrdem]);
-  const { selectedIds, toggleSelect, toggleSelectAll, isSelected } =
+  const { selectedIds, toggleSelect, toggleSelectAll } =
     useSelectedProcessos();
+  const selectedIdsRef = useRef<Set<string>>(new Set());
+  const processosLocalRef = useRef<IProcesso[]>(processos);
   const usuariosResponsaveisRef = useRef<IUsuarioTecnico[]>([]);
+  const interessadosRef = useRef<IInteressado[]>([]);
 
   // Mapa de versões para controle de conflito
   const versionsRef = useRef<Map<string, Date>>(new Map());
@@ -866,10 +1095,44 @@ export default function ProcessosSpreadsheet({
     carregarResponsaveis();
   }, [session?.access_token, session?.grupoAtivo?.id, exibirAtribuicaoUsuario]);
 
+  // Lista de interessados carregada no cliente (uma vez), usada pelo
+  // autocomplete de edição inline. Buscar isso no servidor a cada busca de
+  // processos pesava demais a navegação (payload muito grande).
+  useEffect(() => {
+    async function carregarInteressados() {
+      if (!session?.access_token) return;
+      try {
+        const response = await interessadoService.query.listaCompleta(
+          session.access_token,
+          session.grupoAtivo?.id,
+        );
+        if (Array.isArray(response)) {
+          setInteressados(response);
+        }
+      } catch {
+        toast.error("Erro ao carregar interessados");
+      }
+    }
+
+    carregarInteressados();
+  }, [session?.access_token, session?.grupoAtivo?.id]);
+
   // Sincronizar ref com state
   useEffect(() => {
     expandedRowsRef.current = expandedRows;
   }, [expandedRows]);
+
+  useEffect(() => {
+    selectedIdsRef.current = new Set(selectedIds);
+  }, [selectedIds]);
+
+  useEffect(() => {
+    processosLocalRef.current = processosLocal;
+  }, [processosLocal]);
+
+  useEffect(() => {
+    interessadosRef.current = interessados;
+  }, [interessados]);
 
   // Criar dados da linha incluindo linhas de detalhe
   const rowData = useMemo(() => {
@@ -1014,6 +1277,23 @@ export default function ProcessosSpreadsheet({
     return responsavel?.nome || "";
   }, []);
 
+  // Calculado a cada render a partir do state real (não de refs/closures do AG-Grid),
+  // para que o botão sempre reflita e alterne corretamente o estado atual.
+  const todosExpandidos =
+    processosLocal.length > 0 && expandedRows.size === processosLocal.length;
+
+  const alternarExpandirTudo = () => {
+    if (todosExpandidos) {
+      setExpandedRows(new Set());
+    } else {
+      setExpandedRows(new Set(processosLocal.map((p) => p.id)));
+    }
+    // Sincronizar os ícones de cada linha (coluna "expand")
+    setTimeout(() => {
+      gridRef.current?.api?.refreshCells({ force: true });
+    }, 0);
+  };
+
   const adicionarProcesso = () => {
     const novoProcesso: any = {
       id: `temp-${Date.now()}`,
@@ -1033,7 +1313,7 @@ export default function ProcessosSpreadsheet({
       novoProcesso.usuario_atribuido_id = "";
     }
 
-    setProcessosLocal([...processosLocal, novoProcesso]);
+    setProcessosLocal([novoProcesso, ...processosLocal]);
   };
 
   const compareDateValues = useCallback((valueA: unknown, valueB: unknown) => {
@@ -1066,16 +1346,17 @@ export default function ProcessosSpreadsheet({
           pinned: "left" as const,
           lockPosition: true,
           headerComponent: () => {
+            const processosAtuais = processosLocalRef.current;
             const allSelected =
-              processosLocal.length > 0 &&
-              processosLocal.every((p) => isSelected(p.id));
+              processosAtuais.length > 0 &&
+              processosAtuais.every((p) => selectedIdsRef.current.has(p.id));
 
             return (
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={() =>
-                  toggleSelectAll(processosLocal.map((p) => p.id))
+                  toggleSelectAll(processosAtuais.map((p) => p.id))
                 }
                 title={allSelected ? "Deselecionar tudo" : "Selecionar tudo"}
                 className="cursor-pointer"
@@ -1087,7 +1368,7 @@ export default function ProcessosSpreadsheet({
             if (params.data?._isDetail) return null;
 
             const processo = params.data as IProcesso;
-            const checked = isSelected(processo.id);
+            const checked = selectedIdsRef.current.has(processo.id);
 
             return (
               <input
@@ -1109,31 +1390,7 @@ export default function ProcessosSpreadsheet({
           width: 50,
           pinned: "left" as const,
           lockPosition: true,
-          headerComponent: () => {
-            const allExpanded =
-              expandedRowsRef.current.size === processosLocal.length;
-
-            return (
-              <button
-                onClick={() => {
-                  if (allExpanded) {
-                    setExpandedRows(new Set());
-                  } else {
-                    const allIds = new Set(processosLocal.map((p) => p.id));
-                    setExpandedRows(allIds);
-                  }
-                }}
-                className="flex items-center justify-center w-full h-full hover:bg-gray-100 transition-colors"
-                title={allExpanded ? "Colapsar tudo" : "Expandir tudo"}
-              >
-                {allExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </button>
-            );
-          },
+          headerComponent: ExpandirTudoHeader,
           cellRenderer: (params: ICellRendererParams) => {
             if (params.data?._isDetail) return null;
 
@@ -1235,7 +1492,9 @@ export default function ProcessosSpreadsheet({
             const newValue = params.newValue as string;
 
             // Tentar encontrar o interessado nos existentes
-            let interessadoObj = interessados.find((i) => i.valor === newValue);
+            let interessadoObj = interessadosRef.current.find(
+              (i) => i.valor === newValue,
+            );
 
             // Se não encontrou, criar um novo (será persistido no backend)
             if (!interessadoObj && newValue.trim()) {
@@ -2136,7 +2395,7 @@ export default function ProcessosSpreadsheet({
           key={data._processo.id}
           processo={data._processo as IProcesso}
           unidades={unidades}
-          interessados={interessados}
+          interessados={interessadosRef.current}
         />
       </div>
     );
@@ -2180,74 +2439,81 @@ export default function ProcessosSpreadsheet({
           + Novo Processo
         </Button>
       </div>
-      <div
-        className={`ag-theme-alpine w-full ${
-          theme === "dark" || (theme === "system" && systemTheme === "dark")
-            ? "dark"
-            : ""
-        }`}
-        style={
-          {
-            height: "600px",
-            width: "100%",
-            overflowX: "auto",
-            overflowY: "auto",
-            ...(theme === "dark" ||
-            (theme === "system" && systemTheme === "dark")
-              ? {
-                  "--ag-background-color": "#1a1a1a",
-                  "--ag-header-background-color": "#262626",
-                  "--ag-header-foreground-color": "#e5e7eb",
-                  "--ag-odd-row-background-color": "#1a1a1a",
-                  "--ag-row-hover-color": "#2d2d2d",
-                  "--ag-border-color": "#404040",
-                  "--ag-foreground-color": "#e5e7eb",
-                  "--ag-secondary-foreground-color": "#a3a3a3",
-                  "--ag-cell-horizontal-padding": "12px",
-                }
-              : {
-                  "--ag-header-background-color": "#f8f9fa",
-                  "--ag-header-foreground-color": "#212529",
-                  "--ag-odd-row-background-color": "#ffffff",
-                  "--ag-row-hover-color": "#f1f3f5",
-                  "--ag-border-color": "#dee2e6",
-                }),
-            fontSize: "14px",
-          } as React.CSSProperties
-        }
+      <ExpandirTudoContext.Provider
+        value={{
+          allExpanded: todosExpandidos,
+          toggleAll: alternarExpandirTudo,
+        }}
       >
-        <AgGridReact
-          ref={gridRef}
-          rowData={rowData}
-          columnDefs={colunasRenderizadas}
-          defaultColDef={defaultColDef}
-          onCellValueChanged={onCellValueChanged}
-          onGridReady={onGridReady}
-          getRowId={getRowId}
-          animateRows={false}
-          singleClickEdit={true}
-          stopEditingWhenCellsLoseFocus={true}
-          onColumnMoved={saveColumnState}
-          pagination={false}
-          suppressPaginationPanel={true}
-          suppressHorizontalScroll={false}
-          rowBuffer={10}
-          debounceVerticalScrollbar={true}
-          theme="legacy"
-          // Passar dados dinâmicos para os cell editors
-          context={{
-            unidades: unidades,
-            interessados: interessados,
-          }}
-          // Configurações para linhas expansíveis (Full Width Rows)
-          isFullWidthRow={isFullWidthRow}
-          fullWidthCellRenderer={fullWidthCellRenderer}
-          getRowHeight={getRowHeight}
-          getRowStyle={getRowStyle}
-          suppressCellFocus={true}
-          overlayNoRowsTemplate="Nenhum processo cadastrado"
-        />
-      </div>
+        <div
+          className={`ag-theme-alpine w-full ${
+            theme === "dark" || (theme === "system" && systemTheme === "dark")
+              ? "dark"
+              : ""
+          }`}
+          style={
+            {
+              height: "600px",
+              width: "100%",
+              overflowX: "auto",
+              overflowY: "auto",
+              ...(theme === "dark" ||
+              (theme === "system" && systemTheme === "dark")
+                ? {
+                    "--ag-background-color": "#1a1a1a",
+                    "--ag-header-background-color": "#262626",
+                    "--ag-header-foreground-color": "#e5e7eb",
+                    "--ag-odd-row-background-color": "#1a1a1a",
+                    "--ag-row-hover-color": "#2d2d2d",
+                    "--ag-border-color": "#404040",
+                    "--ag-foreground-color": "#e5e7eb",
+                    "--ag-secondary-foreground-color": "#a3a3a3",
+                    "--ag-cell-horizontal-padding": "12px",
+                  }
+                : {
+                    "--ag-header-background-color": "#f8f9fa",
+                    "--ag-header-foreground-color": "#212529",
+                    "--ag-odd-row-background-color": "#ffffff",
+                    "--ag-row-hover-color": "#f1f3f5",
+                    "--ag-border-color": "#dee2e6",
+                  }),
+              fontSize: "14px",
+            } as React.CSSProperties
+          }
+        >
+          <AgGridReact
+            ref={gridRef}
+            rowData={rowData}
+            columnDefs={colunasRenderizadas}
+            defaultColDef={defaultColDef}
+            onCellValueChanged={onCellValueChanged}
+            onGridReady={onGridReady}
+            getRowId={getRowId}
+            animateRows={false}
+            singleClickEdit={true}
+            stopEditingWhenCellsLoseFocus={true}
+            onColumnMoved={saveColumnState}
+            pagination={false}
+            suppressPaginationPanel={true}
+            suppressHorizontalScroll={false}
+            rowBuffer={10}
+            debounceVerticalScrollbar={true}
+            theme="legacy"
+            // Passar dados dinâmicos para os cell editors
+            context={{
+              unidades: unidades,
+              interessados: interessados,
+            }}
+            // Configurações para linhas expansíveis (Full Width Rows)
+            isFullWidthRow={isFullWidthRow}
+            fullWidthCellRenderer={fullWidthCellRenderer}
+            getRowHeight={getRowHeight}
+            getRowStyle={getRowStyle}
+            suppressCellFocus={true}
+            overlayNoRowsTemplate="Nenhum processo cadastrado"
+          />
+        </div>
+      </ExpandirTudoContext.Provider>
     </div>
   );
 }

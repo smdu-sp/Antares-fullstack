@@ -86,6 +86,7 @@ export interface ICreateProcesso {
 export interface IUpdateProcesso {
   numero_sei?: string;
   assunto?: string;
+  interessado_id?: string | null;
   unidade_interessada_id?: string;
   unidade_remetente_id?: string;
   unidade_destino_id?: string;

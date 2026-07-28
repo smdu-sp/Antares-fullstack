@@ -12,7 +12,7 @@ export async function contarConcluidos(
       `${getApiUrl()}processos/contar/concluidos`,
       {
         headers: buildAuthHeaders(token, grupoAtivoId),
-        cache: "no-store",
+        next: { tags: ["processos"], revalidate: 60 },
       },
     );
 

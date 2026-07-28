@@ -17,7 +17,7 @@ export async function contarAtrasados(
     const response = await fetch(`${baseURL}processos/contar/atrasados`, {
       method: "GET",
       headers: buildAuthHeaders(access_token, grupoAtivoId),
-      cache: "no-store",
+      next: { tags: ["processos"], revalidate: 60 },
     });
     const data = await response.json();
     if (response.status === 200)

@@ -13,7 +13,9 @@ export async function listaCompleta(
     const response = await fetch(url, {
       method: "GET",
       headers: buildAuthHeaders(token, grupoAtivoId),
-      cache: "no-store",
+      // Lista não depende da busca do usuário; cache curto reduz round-trips
+      // a cada tecla digitada nos filtros da página de processos.
+      next: { tags: ["interessados"], revalidate: 60 },
     });
 
     if (!response.ok) {

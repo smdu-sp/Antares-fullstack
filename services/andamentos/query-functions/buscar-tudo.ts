@@ -16,6 +16,9 @@ export async function buscarTudo(
     `${baseURL}andamentos?pagina=${pagina}&limite=${limite}`,
     {
       headers: buildAuthHeaders(access_token, grupoAtivoId),
+      // Usado para métricas do dashboard, não depende da busca do usuário;
+      // cache curto evita refazer essa consulta pesada a cada tecla digitada.
+      next: { tags: ["andamentos"], revalidate: 60 },
     },
   );
 
