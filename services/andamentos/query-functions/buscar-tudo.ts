@@ -2,7 +2,7 @@
 
 import { IAndamento, IRespostaAndamento } from "@/types/processo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarTudo(
   access_token: string,
@@ -10,7 +10,7 @@ export async function buscarTudo(
   limite: number = 100,
   grupoAtivoId?: string,
 ): Promise<IRespostaAndamento> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   const response = await fetch(
     `${baseURL}andamentos?pagina=${pagina}&limite=${limite}`,

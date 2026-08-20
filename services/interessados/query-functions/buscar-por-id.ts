@@ -2,8 +2,9 @@
 
 import { IInteressado } from "@/types/interessado";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND;
+const BACKEND = getInternalApiUrl();
 
 export async function buscarPorId(
   token: string,
@@ -11,7 +12,7 @@ export async function buscarPorId(
   grupoAtivoId?: string,
 ) {
   try {
-    const resposta = await fetch(`${BACKEND}/interessados/${id}`, {
+    const resposta = await fetch(`${BACKEND}interessados/${id}`, {
       headers: buildAuthHeaders(token, grupoAtivoId),
       next: {
         revalidate: 60,

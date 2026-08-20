@@ -41,7 +41,13 @@ export function ExportProcessoButton({ processoId }: { processoId: string }) {
         const timestamp = new Date().toISOString().split('T')[0];
         const filename = `processo_${processoId}_${timestamp}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
         downloadBlob(result.blob, filename);
-        toast.success(`Processo exportado para ${format.toUpperCase()}`);
+        if (result.aviso) {
+          toast.warning(`Processo exportado para ${format.toUpperCase()}`, {
+            description: result.aviso,
+          });
+        } else {
+          toast.success(`Processo exportado para ${format.toUpperCase()}`);
+        }
       } else {
         toast.error(result.error || 'Erro ao exportar processo');
       }

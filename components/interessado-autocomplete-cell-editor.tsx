@@ -5,10 +5,6 @@
 import { IInteressado } from "@/types/interessado";
 import { ICellEditorComp } from "ag-grid-community";
 import { criar as criarInteressado } from "@/services/interessados/server-functions/criar";
-import {
-  listarTodas as listarTodosInteressados,
-  reativarInteressado,
-} from "@/services/interessados/server-functions/listar-todas";
 import { toast } from "sonner";
 class InteressadoAutocompleteCellEditor implements ICellEditorComp {
   private eGui!: HTMLDivElement;
@@ -224,26 +220,11 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
         return;
       }
 
-      // Chamar server function para criar
-      let resposta = await criarInteressado({
+      // Chamar server function para criar (reativa automaticamente um interessado
+      // inativo com o mesmo nome, se existir — ver lib/server/interessados/criar.ts)
+      const resposta = await criarInteressado({
         valor: valor.trim(),
       });
-
-      // Se erro de duplicata (409 Conflict ou mensagem de duplicata), tentar reativar
-      const isDuplicata =
-        resposta.status === 409 ||
-        (resposta.error &&
-          resposta.error.toLowerCase().includes("já existe")) ||
-        (resposta.error && resposta.error.toLowerCase().includes("duplicat"));
-
-      if (!resposta.ok && isDuplicata) {
-        try {
-          // Tentar reativar um interessado inativo com mesmo valor
-          resposta = await this.reativarInteressadoInativo(valor.trim());
-        } catch (error) {
-          console.error("Erro ao reativar interessado:", error);
-        }
-      }
 
       if (resposta.ok && resposta.data) {
         // Interessado criado ou reativado com sucesso
@@ -273,47 +254,6 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
     } finally {
       this.input.disabled = false;
       this.input.style.opacity = "1";
-    }
-  }
-
-  private async reativarInteressadoInativo(valor: string) {
-    try {
-      // Buscar todos os interessados (incluindo inativos) via server action
-      const todosInteressados = await listarTodosInteressados();
-
-      // Procurar interessado inativo com mesmo valor
-      const interessadoInativo = todosInteressados.find(
-        (i: IInteressado) =>
-          i.ativo === false && i.valor.toUpperCase() === valor.toUpperCase(),
-      );
-
-      if (interessadoInativo) {
-        // Reativar o interessado
-        const respostaAtualizar = await reativarInteressado(
-          interessadoInativo.id,
-          {
-            valor: valor,
-          },
-        );
-
-        return respostaAtualizar;
-      }
-
-      // Se não encontrou inativo, retornar erro
-      return {
-        ok: false,
-        error: "Interessado não encontrado",
-        data: null,
-        status: 404,
-      };
-    } catch (error) {
-      console.error("Erro ao reativar interessado:", error);
-      return {
-        ok: false,
-        error: "Erro ao reativar interessado",
-        data: null,
-        status: 500,
-      };
     }
   }
 

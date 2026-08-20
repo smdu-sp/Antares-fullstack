@@ -2,7 +2,7 @@
 
 import { IPaginadoLog } from "@/types/log";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarTudo(
   token: string,
@@ -33,7 +33,7 @@ export async function buscarTudo(
     if (dataFim) params.append("dataFim", dataFim);
 
     const response = await fetch(
-      `${getApiUrl()}logs?${params.toString()}`,
+      `${getInternalApiUrl()}logs?${params.toString()}`,
       {
         method: "GET",
         headers: buildAuthHeaders(token, grupoAtivoId),

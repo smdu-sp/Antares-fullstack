@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export type AtualizarPermissoesDevPayload = {
   coordenadoria?: "EXPEDIENTE" | "SERVIN";
@@ -25,7 +25,7 @@ export async function atualizarPermissoesDev(
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(

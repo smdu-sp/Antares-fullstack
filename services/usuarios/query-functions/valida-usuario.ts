@@ -1,26 +1,32 @@
-﻿/** @format */
+/** @format */
 
-import { auth } from "@/lib/auth/auth";
-import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { IRespostaUsuario, IUsuario } from "@/types/usuario";
-import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
-export async function validaUsuario(): Promise<IRespostaUsuario> {
-  const session = await auth();
-  if (!session) redirect("/login");
-  const baseURL = getApiUrl();
+export async function validaUsuario(
+  access_token: string,
+  grupoAtivoId?: string,
+): Promise<IRespostaUsuario> {
+  const baseURL = getInternalApiUrl();
   try {
     const usuario = await fetch(`${baseURL}usuarios/valida-usuario`, {
       method: "GET",
-      headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),
+      headers: buildAuthHeaders(access_token, grupoAtivoId),
     });
     const data = await usuario.json();
+    if (usuario.status === 200)
+      return {
+        ok: true,
+        error: null,
+        data: data as IUsuario,
+        status: 200,
+      };
     return {
-      ok: true,
-      error: null,
-      data: data as IUsuario,
-      status: 200,
+      ok: false,
+      error: data.message,
+      data: null,
+      status: data.statusCode,
     };
   } catch (error) {
     // Erro ao validar usuário

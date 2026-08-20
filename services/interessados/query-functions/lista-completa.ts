@@ -2,14 +2,14 @@
 
 import { IInteressado } from "@/types/interessado";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function listaCompleta(
   token: string,
   grupoAtivoId?: string,
 ): Promise<IInteressado[]> {
   try {
-    const url = `${getApiUrl()}interessados/lista-completa`;
+    const url = `${getInternalApiUrl()}interessados/lista-completa`;
     const response = await fetch(url, {
       method: "GET",
       headers: buildAuthHeaders(token, grupoAtivoId),

@@ -5,9 +5,9 @@
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
-const BACKEND = getApiUrl();
+const BACKEND = getInternalApiUrl();
 
 export async function criar(data: any) {
   try {

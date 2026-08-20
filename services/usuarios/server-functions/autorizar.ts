@@ -8,12 +8,12 @@ import { IRespostaUsuario } from "@/types/usuario";
 import { revalidateTag } from "next/cache";
 
 import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function autorizar(id: string): Promise<IRespostaUsuario> {
   const session = await auth();
   if (!session) redirect("/login");
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   const autorizado = await fetch(`${baseURL}usuarios/autorizar/${id}`, {
     method: "PATCH",
     headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),

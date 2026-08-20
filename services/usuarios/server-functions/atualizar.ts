@@ -7,7 +7,7 @@ import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { IRespostaUsuario, IUpdateUsuario, IUsuario } from "@/types/usuario";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function atualizar(
   id: string,
@@ -15,7 +15,7 @@ export async function atualizar(
 ): Promise<IRespostaUsuario> {
   const session = await auth();
   if (!session) redirect("/login");
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response: Response = await fetch(

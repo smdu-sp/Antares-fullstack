@@ -1,0 +1,332 @@
+// Model: OrigemProcesso | Tabela: origens_processo | Descrição: Armazena valores únicos de unidade de origem digitados nos processos para autocomplete
+model OrigemProcesso {
+  id     String  @id @default(uuid()) // ID único
+  valor  String  @unique // Valor da unidade de origem digitado (texto livre, único)
+  criadoEm DateTime @default(now()) // Data/hora de criação
+
+  @@map("origens_processo")
+}
+
+// Model: Interessado | Tabela: interessados | Descrição: Armazena valores únicos de interessados digitados nos processos para autocomplete
+model Interessado {
+  id     String  @id @default(uuid()) // ID único
+  valor  String  @db.VarChar(768) @unique // Nome do interessado digitado (texto livre, único) — 768 é o máximo para índice único com utf8mb4
+  ativo  Boolean @default(true) // Indica se o interessado está ativo (true) ou foi excluído logicamente (false) - Boolean - Valor padrão: true
+  criadoEm DateTime @default(now()) // Data/hora de criação
+
+  processos processo[] // Lista de processos relacionados a este interessado
+
+  @@map("interessados")
+}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum: Permissões de acesso dos usuários no sistema - Define os níveis de permissão para controle de acesso às funcionalidades
+enum Permissao {
+  DEV // Desenvolvedor: Acesso total ao sistema, incluindo configurações e desenvolvimento
+  ADM // Administrador: Acesso administrativo completo, pode gerenciar usuários e processos
+  TEC // Técnico: Pode criar e gerenciar processos e andamentos
+  USR // Usuário: Acesso básico, apenas visualização de processos e andamentos
+}
+
+// Enum: Permissões de grupo (papel do usuário dentro de cada grupo)
+enum PermissaoGrupo {
+  ADM
+  TEC
+  USR
+}
+
+// Enum: Códigos padrão de grupos de acesso
+enum GrupoCodigo {
+  EXPEDIENTE
+  SERVIN
+  GABINETE
+  GLOBAL
+  OUTORGA
+}
+
+// Enum: Tipo de grupo para separar coordenadoria e divisão
+enum GrupoTipo {
+  COORDENADORIA
+  DIVISAO
+}
+
+// Enum: Nível de visão do grupo sobre os dados do processo
+enum NivelVisaoGrupoProcesso {
+  TOTAL
+  PARCIAL
+}
+
+// Enum: Status do andamento do processo - Indica em qual situação se encontra o andamento do processo
+enum StatusAndamento {
+  EM_ANDAMENTO // Processo está em tramitação, aguardando retorno
+  CONCLUIDO // Processo foi concluído e retornado à unidade de origem
+  PRORROGADO // Prazo foi prorrogado, nova data limite definida
+}
+
+// Enum: Tipos de ações registradas no log do sistema - Define os tipos de operações que podem ser registradas
+enum TipoAcao {
+  PROCESSO_CRIADO // Processo foi criado no sistema
+  PROCESSO_ATUALIZADO // Processo foi atualizado (número SEI ou assunto alterado)
+  PROCESSO_REMOVIDO // Processo foi removido do sistema
+  ANDAMENTO_CRIADO // Andamento foi criado (processo enviado de uma unidade para outra)
+  ANDAMENTO_ATUALIZADO // Andamento foi atualizado (origem, destino, prazo ou observação alterados)
+  ANDAMENTO_PRORROGADO // Prazo do andamento foi prorrogado
+  ANDAMENTO_CONCLUIDO // Andamento foi concluído (processo retornado)
+  ANDAMENTO_REMOVIDO // Andamento foi removido do sistema
+  USUARIO_PERMISSAO_ATUALIZADA // Permissões de usuário atualizadas por painel DEV
+  GRUPO_ATUALIZADO // Cadastro de grupo atualizado por painel DEV
+  PROCESSO_GRUPO_ATUALIZADO // Vínculo de processo x grupo atualizado por painel DEV
+}
+
+// Model: Unidade | Tabela: unidades | Descrição: Armazena informações das unidades organizacionais do sistema
+model Unidade {
+  id           String   @id @default(uuid()) // ID único da unidade (UUID gerado automaticamente) - Chave primária
+  nome         String   @unique // Nome completo da unidade - Obrigatório - Único - Exemplo: "Coordenadoria Jurídica"
+  sigla        String   @unique // Sigla da unidade - Obrigatório - Único - Exemplo: "COJUR"
+  ativo        Boolean  @default(true) // Indica se a unidade está ativa (true) ou foi excluída logicamente (false) - Boolean - Valor padrão: true
+  criadoEm     DateTime @default(now()) // Data e hora de criação do registro da unidade - DateTime - Valor padrão: Data/hora atual (definido apenas na criação)
+  atualizadoEm DateTime @default(now()) @updatedAt // Data e hora da última atualização do registro - DateTime - Atualizado automaticamente a cada modificação
+
+  usuarios  Usuario[] // Lista de usuários pertencentes a esta unidade - Array de Usuario - Usuários vinculados à unidade
+  processos processo[] // Lista de processos cadastrados por esta unidade - Array de processo - Processos vinculados à unidade
+  processosRemetentes processo[] @relation("UnidadeRemetente") // Lista de processos onde esta unidade é a remetente - Array de processo - Processos remetidos por esta unidade
+  processosDestinatarios processo[] @relation("UnidadeDestino") // Lista de processos onde esta unidade é a destinatária - Array de processo - Processos destinados a esta unidade
+
+  @@map("unidades")
+}
+
+// Model: Usuario | Tabela: usuarios | Descrição: Armazena informações dos usuários do sistema (servidores da secretaria)
+model Usuario {
+  id         String    @id @default(uuid()) // ID único do usuário (UUID gerado automaticamente) - Chave primária
+  nome       String // Nome completo do usuário - Obrigatório - Exemplo: "João da Silva"
+  nomeSocial String? // Nome social do usuário (opcional) - Nome pelo qual o usuário prefere ser chamado
+  login      String    @unique // Login do usuário para acesso ao sistema - Obrigatório - Único - Exemplo: "joao.silva"
+  email      String    @unique // E-mail do usuário - Obrigatório - Único - Deve ser um e-mail válido - Exemplo: "joao.silva@prefeitura.gov.br"
+  permissao  Permissao @default(USR) // Permissão de acesso do usuário no sistema - Enum (Permissao) - Valor padrão: USR - Valores: DEV, ADM, TEC, USR
+
+  status     Boolean   @default(true) // Status ativo/inativo do usuário - Boolean - Valor padrão: true (ativo) - false = usuário desativado, não pode acessar o sistema
+  avatar     String?   // URL ou caminho da imagem de avatar do usuário - String (TEXT no banco) - Opcional - Armazena URL ou base64 da foto
+  unidade_id String // ID da unidade à qual o usuário pertence (chave estrangeira) - String (UUID) - Obrigatório - Referência à unidade do usuário
+  unidade    Unidade   @relation(fields: [unidade_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade à qual o usuário pertence
+
+  ultimoLogin  DateTime @default(now()) // Data e hora do último login do usuário no sistema - DateTime - Valor padrão: Data/hora atual (atualizado a cada login)
+  criadoEm     DateTime @default(now()) // Data e hora de criação do registro do usuário - DateTime - Valor padrão: Data/hora atual (definido apenas na criação)
+  atualizadoEm DateTime @default(now()) @updatedAt // Data e hora da última atualização do registro - DateTime - Atualizado automaticamente a cada modificação
+
+  andamentosCriados     andamento[]           @relation("AndamentoCriadoPor") // Lista de andamentos criados por este usuário - Array de andamento - Histórico de andamentos criados pelo usuário
+  andamentosProrrogados andamento[]           @relation("AndamentoProrrogadoPor") // Lista de andamentos prorrogados por este usuário - Array de andamento - Histórico de andamentos prorrogados pelo usuário
+  logs                  Log[] // Lista de logs de ações realizadas por este usuário - Array de Log - Histórico completo de ações do usuário no sistema
+  preferencias          PreferenciasUsuario[] // Lista de preferências do usuário - Array de PreferenciasUsuario - Configurações personalizadas do usuário
+  processosAtribuidos   processo[] @relation("ProcessoAtribuidoPara") // Processos atribuídos diretamente ao usuário (escopo SERVIN)
+  grupos                UsuarioGrupo[] // Vínculos de grupos do usuário para autorização granular
+
+  @@map("usuarios")
+}
+
+// Model: processo | Tabela: processos | Descrição: Armazena informações dos processos administrativos que são controlados pelo sistema
+model processo {
+  id                      String      @id @default(uuid()) // ID único do processo (UUID gerado automaticamente) - Chave primária
+  numero_sei              String      @unique // Número SEI (Sistema Eletrônico de Informações) do processo - String - Obrigatório - Único - Número único que identifica o processo no sistema SEI - Exemplo: "1234567"
+  assunto                 String      @db.Text // Assunto do processo - TEXT - Obrigatório - Descrição detalhada do que trata o processo - Suporta textos longos até 65.535 caracteres - Exemplo: "Solicitação de licença para obra com descrição detalhada dos requisitos técnicos, localização, impacto ambiental e documentação necessária"
+  origem                  String      @default("EXPEDIENTE") // Unidade de origem do processo - String - Obrigatório - Unidade que originou/solicitou o processo - Exemplo: "EXPEDIENTE", "COORDENADORIA_JURIDICA" - Valor padrão: EXPEDIENTE
+  interessado_id          String? // ID do interessado (chave estrangeira) - String (UUID) - Opcional - Referência ao interessado do processo
+  interessado             Interessado? @relation(fields: [interessado_id], references: [id]) // Relacionamento com o modelo Interessado - Interessado do processo
+  unidade_remetente_id    String? // ID da unidade remetente (chave estrangeira) - String (UUID) - Opcional - Referência à unidade que está remetendo o processo
+  unidadeRemetente        Unidade?    @relation("UnidadeRemetente", fields: [unidade_remetente_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade remetente do processo
+  unidade_destino_id      String? // ID da unidade destinatária (chave estrangeira) - String (UUID) - Opcional - Referência à unidade que é a destinatária do processo
+  unidadeDestino          Unidade?    @relation("UnidadeDestino", fields: [unidade_destino_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade destinatária do processo
+  prazo                   DateTime? // Prazo limite para conclusão do processo - DateTime (opcional) - Exemplo: "2025-12-31T00:00:00.000Z"
+  prorrogacao             DateTime? // Nova data limite caso o processo tenha sido prorrogado - DateTime (opcional) - Semelhante ao campo de andamentos
+  data_recebimento        DateTime    @default(now()) // Data em que o gabinete recebeu o processo - DateTime - Valor padrão: Data/hora atual - Pode ser data atual ou anterior
+  data_envio_unidade      DateTime? // Data em que o processo foi enviado para a unidade - DateTime (opcional) - Data de envio do processo para a unidade responsável
+  data_resposta_final     DateTime? // Data em que o gabinete respondeu o processo ao solicitante - DateTime (opcional) - Data de fechamento/conclusão do processo
+  resposta_final          String? // Resposta final dada ao processo - String (opcional) - Texto com a resposta/despacho final do processo
+  unidade_respondida_id   String? // ID/Sigla da unidade que foi respondida - String (opcional) - Identifica qual unidade recebeu a resposta final
+  usuario_atribuido_id    String? // ID do usuário ao qual o processo está atribuído (especialmente para fluxos SERVIN)
+  usuarioAtribuido        Usuario? @relation("ProcessoAtribuidoPara", fields: [usuario_atribuido_id], references: [id])
+  ativo                   Boolean     @default(true) // Indica se o processo está ativo (true) ou foi excluído logicamente (false) - Boolean - Valor padrão: true
+  unidade_id              String // ID da unidade que cadastrou o processo (chave estrangeira) - String (UUID) - Obrigatório - Referência à unidade responsável pelo processo
+  unidade                 Unidade     @relation(fields: [unidade_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade que cadastrou o processo
+  criadoEm                DateTime    @default(now()) // Data e hora de criação do registro do processo - DateTime - Valor padrão: Data/hora atual (definido apenas na criação)
+  atualizadoEm            DateTime    @default(now()) @updatedAt // Data e hora da última atualização do registro - DateTime - Atualizado automaticamente a cada modificação
+  andamentos              andamento[] // Lista de andamentos relacionados a este processo - Array de andamento - Histórico completo de movimentações do processo entre unidades
+  grupos                  ProcessoGrupo[] // Vínculos com grupos para suportar visibilidade multi-grupo
+
+  // Campos calculados (2026-08-19), mantidos em sincronia por recalcularPrazoEfetivo()
+  // sempre que um andamento é criado/editado/removido — replicam a MESMA regra que
+  // ProcessosService.buscarTudo usa nos filtros vencendoHoje/atrasados/concluidos, só que
+  // pré-computados: a consulta original precisava de uma subquery correlacionada em
+  // `andamentos` por processo candidato, o que não escalava (5+s com dezenas de milhares
+  // de linhas). `prazo_efetivo` = menor (prorrogacao ?? prazo) entre os andamentos ativos
+  // com status EM_ANDAMENTO/PRORROGADO; fica nulo se algum andamento ativo está CONCLUIDO
+  // (mesma regra de desqualificação do filtro original) ou se não há prazo em aberto.
+  prazo_efetivo               DateTime?
+  andamentos_todos_concluidos Boolean    @default(false)
+
+  @@index([prazo_efetivo])
+  @@index([andamentos_todos_concluidos])
+
+  // Índices adicionados para escala (2026-08-19): sem eles, toda listagem/exportação faz
+  // table scan a partir de dezenas de milhares de linhas. `[ativo, criadoEm]` cobre o par
+  // filtro+ordenação usado em praticamente toda consulta; prazo/prorrogacao cobrem os
+  // filtros de vencendoHoje/atrasados.
+  @@index([ativo, criadoEm])
+  @@index([prazo])
+  @@index([prorrogacao])
+  @@map("processos")
+}
+
+// Model: andamento | Tabela: andamentos | Descrição: Armazena o histórico de movimentações dos processos entre unidades, controlando prazos e status
+model andamento {
+  id                     String          @id @default(uuid()) // ID único do andamento (UUID gerado automaticamente) - Chave primária
+  origem                 String // Unidade de origem (de onde o processo está saindo) - String - Obrigatório - Nome ou sigla da unidade que está enviando o processo - Exemplo: "EXPEDIENTE", "COORDENADORIA_JURIDICA"
+  destino                String // Unidade de destino (para onde o processo está indo) - String - Obrigatório - Nome ou sigla da unidade que receberá o processo - Exemplo: "COORDENADORIA_JURIDICA", "GABINETE"
+  data_envio             DateTime? // Data em que o gabinete enviou o processo para a unidade - DateTime (opcional) - Data em que o processo foi efetivamente enviado da origem para o destino - Pode ser preenchida na criação ou posteriormente
+  prazo                  DateTime? // Data limite para retorno do processo à unidade de origem - DateTime (opcional) - Valor padrão: null - Pode ser preenchida na criação ou posteriormente - Data até a qual o processo deve ser retornado. Se não retornado até esta data, está em atraso
+  prorrogacao            DateTime? // Nova data limite caso o processo tenha sido prorrogado - DateTime (opcional) - Se preenchido, indica que o prazo foi prorrogado e esta é a nova data limite - Observação: Quando preenchido, o status deve ser alterado para PRORROGADO
+  resposta               DateTime? // Data em que o processo recebeu resposta e foi retornado à unidade de origem - DateTime (opcional) - Data em que o processo foi finalizado e devolvido. Se preenchido, o status deve ser CONCLUIDO
+  status                 StatusAndamento @default(EM_ANDAMENTO) // Status atual do andamento - Enum (StatusAndamento) - Valor padrão: EM_ANDAMENTO - Valores: EM_ANDAMENTO (em tramitação), CONCLUIDO (concluído e retornado), PRORROGADO (prazo prorrogado)
+  observacao             String? // Observações sobre o andamento - String (opcional) - Campo livre para anotações, justificativas de prorrogação, ou outras informações relevantes
+  assunto                String? @db.Text // Assunto específico do andamento - String (TEXT no banco) - Opcional - Campo independente do assunto do processo, pode conter informações específicas sobre este envio/tramitação
+  ativo                  Boolean         @default(true) // Indica se o andamento está ativo (true) ou foi excluído logicamente (false) - Boolean - Valor padrão: true
+  criadoEm               DateTime        @default(now()) // Data e hora de criação do registro do andamento - DateTime - Valor padrão: Data/hora atual (definido apenas na criação) - Representa a data em que o processo foi enviado da origem para o destino
+  atualizadoEm           DateTime        @default(now()) @updatedAt // Data e hora da última atualização do registro - DateTime - Atualizado automaticamente a cada modificação
+  processo_id            String // ID do processo relacionado (chave estrangeira) - String (UUID) - Obrigatório - Referência ao processo ao qual este andamento pertence
+  processo               processo        @relation(fields: [processo_id], references: [id]) // Relacionamento com o modelo processo - Processo ao qual este andamento está vinculado
+  usuario_id             String // ID do usuário que criou o andamento (chave estrangeira) - String (UUID) - Obrigatório - Referência ao usuário que criou este andamento
+  usuario                Usuario         @relation("AndamentoCriadoPor", fields: [usuario_id], references: [id]) // Relacionamento com o modelo Usuario - Usuário que criou este andamento
+  usuario_prorrogacao_id String? // ID do usuário que prorrogou o prazo (chave estrangeira) - String (UUID) - Opcional - Referência ao usuário que prorrogou este andamento - Só preenchido quando há prorrogação
+  usuarioProrrogacao     Usuario?        @relation("AndamentoProrrogadoPor", fields: [usuario_prorrogacao_id], references: [id]) // Relacionamento com o modelo Usuario - Usuário que prorrogou este andamento
+
+  // Índices adicionados para escala (2026-08-19) — ver nota equivalente no model processo.
+  // status/prazo/prorrogacao/resposta/destino cobrem os filtros usados nos contadores
+  // (vencidos, vencendo-hoje, concluídos) e na exportação.
+  @@index([ativo, criadoEm])
+  @@index([status])
+  @@index([prazo])
+  @@index([prorrogacao])
+  @@index([resposta])
+  @@index([destino])
+  @@map("andamentos")
+}
+
+// Model: Log | Tabela: logs | Descrição: Armazena o histórico de todas as ações realizadas no sistema para auditoria e rastreabilidade
+model Log {
+  id           String   @id @default(uuid()) // ID único do log (UUID gerado automaticamente) - Chave primária
+  tipoAcao     TipoAcao // Tipo de ação realizada - Enum (TipoAcao) - Obrigatório - Define qual tipo de operação foi realizada
+  descricao    String   @db.LongText // Descrição detalhada da ação realizada - String (LONGTEXT no banco) - Obrigatório - Descrição completa do que foi feito, incluindo dados relevantes
+  entidadeTipo String // Tipo da entidade afetada (processo, andamento, etc.) - String - Obrigatório - Identifica qual tipo de entidade foi afetada pela ação - Exemplo: "processo", "andamento"
+  entidadeId   String // ID da entidade afetada - String (UUID) - Obrigatório - ID da entidade que foi criada, atualizada ou removida
+  dadosAntigos String? @db.LongText // Dados anteriores (em JSON) antes da alteração - String (LONGTEXT no banco) - Opcional - Armazena o estado anterior da entidade em formato JSON para comparação
+  dadosNovos   String? @db.LongText // Dados novos (em JSON) após a alteração - String (LONGTEXT no banco) - Opcional - Armazena o novo estado da entidade em formato JSON
+  ativo        Boolean  @default(true) // Indica se o log está ativo (true) ou foi excluído logicamente (false) - Boolean - Valor padrão: true
+  criadoEm     DateTime @default(now()) // Data e hora em que a ação foi realizada - DateTime - Valor padrão: Data/hora atual - Timestamp exato da ação
+  usuario_id   String // ID do usuário que realizou a ação (chave estrangeira) - String (UUID) - Obrigatório - Referência ao usuário que executou a ação
+  usuario      Usuario  @relation(fields: [usuario_id], references: [id]) // Relacionamento com o modelo Usuario - Usuário que realizou a ação
+
+  @@index([usuario_id])
+  @@index([entidadeTipo, entidadeId])
+  @@index([tipoAcao])
+  @@index([criadoEm])
+  @@map("logs")
+}
+
+// Model: Grupo | Tabela: grupos | Descrição: Cadastro central de grupos de acesso (coordenadoria/divisão)
+model Grupo {
+  id           String      @id @default(uuid())
+  codigo       GrupoCodigo @default(EXPEDIENTE)
+  nome         String
+  tipo         GrupoTipo   @default(COORDENADORIA)
+  ativo        Boolean     @default(true)
+  criadoEm     DateTime    @default(now())
+  atualizadoEm DateTime    @default(now()) @updatedAt
+
+  usuarios  UsuarioGrupo[]
+  processos ProcessoGrupo[]
+
+  @@unique([codigo, tipo])
+  @@index([codigo])
+  @@index([tipo])
+  @@map("grupos")
+}
+
+// Model: UsuarioGrupo | Tabela: usuarios_grupos | Descrição: Vínculo N:N entre usuário e grupos
+model UsuarioGrupo {
+  id           String   @id @default(uuid())
+  usuario_id   String
+  grupo_id     String
+  permissao_grupo PermissaoGrupo @default(USR)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
+
+  usuario      Usuario  @relation(fields: [usuario_id], references: [id])
+  grupo        Grupo    @relation(fields: [grupo_id], references: [id])
+  permissao    UsuarioGrupoPermissao?
+
+  @@unique([usuario_id, grupo_id])
+  @@index([usuario_id])
+  @@index([grupo_id])
+  @@map("usuarios_grupos")
+}
+
+// Model: UsuarioGrupoPermissao | Tabela: usuarios_grupos_permissoes | Descrição: Permissões combináveis por usuário dentro de um grupo
+model UsuarioGrupoPermissao {
+  id                 String   @id @default(uuid())
+  usuario_grupo_id   String   @unique
+  visualizar_proprios Boolean @default(false)
+  visualizar_grupo   Boolean  @default(false)
+  modificar_proprios Boolean  @default(false)
+  modificar_grupo    Boolean  @default(false)
+  excluir            Boolean  @default(false)
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @default(now()) @updatedAt
+
+  usuarioGrupo       UsuarioGrupo @relation(fields: [usuario_grupo_id], references: [id])
+
+  @@index([usuario_grupo_id])
+  @@map("usuarios_grupos_permissoes")
+}
+
+// Model: ProcessoGrupo | Tabela: processos_grupos | Descrição: Vínculo N:N entre processos e grupos com nível de visão por grupo
+model ProcessoGrupo {
+  id           String                  @id @default(uuid())
+  processo_id  String
+  grupo_id     String
+  nivelVisao   NivelVisaoGrupoProcesso @default(TOTAL)
+  ativo        Boolean                 @default(true)
+  criadoEm     DateTime                @default(now())
+  atualizadoEm DateTime                @default(now()) @updatedAt
+
+  processo     processo @relation(fields: [processo_id], references: [id])
+  grupo        Grupo    @relation(fields: [grupo_id], references: [id])
+
+  @@unique([processo_id, grupo_id])
+  @@index([processo_id])
+  @@index([grupo_id])
+  @@map("processos_grupos")
+}
+
+// Model: PreferenciasUsuario | Tabela: preferencias_usuario | Descrição: Armazena preferências e configurações personalizadas de cada usuário
+model PreferenciasUsuario {
+  id                  String   @id @default(uuid()) // ID único da preferência (UUID gerado automaticamente) - Chave primária
+  chave               String // Chave identificadora da preferência - String - Obrigatório - Identifica o tipo de preferência (ex: "ag-grid-column-state", "theme", "language") - Exemplo: "ag-grid-column-state"
+  valor               String   @db.Text // Valor da preferência em formato JSON - String (TEXT no banco) - Obrigatório - Armazena o valor da preferência, geralmente em formato JSON
+  ativo               Boolean  @default(true) // Controle de exclusão virtual das preferências
+  criadoEm            DateTime @default(now()) // Data e hora de criação da preferência - DateTime - Valor padrão: Data/hora atual
+  atualizadoEm        DateTime @default(now()) @updatedAt // Data e hora da última atualização - DateTime - Atualizado automaticamente
+  usuario_id          String // ID do usuário dono da preferência (chave estrangeira) - String (UUID) - Obrigatório
+  usuario             Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade) // Relacionamento com Usuario - Deleta preferências se usuário for deletado
+
+  @@unique([usuario_id, chave]) // Cada usuário pode ter apenas uma preferência por chave
+  @@index([usuario_id])
+  @@map("preferencias_usuario")
+}

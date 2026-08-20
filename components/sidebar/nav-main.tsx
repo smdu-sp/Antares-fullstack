@@ -8,7 +8,7 @@ import {
   FileText,
   Building2,
   UserCircle,
-  Network,
+  ShieldCheck,
 } from "lucide-react";
 
 import {
@@ -77,9 +77,9 @@ export async function NavMain() {
     ...(session?.usuario?.permissao === "DEV"
       ? [
           {
-            icone: Network,
-            titulo: "Coordenadorias",
-            url: "/coordenadorias",
+            icone: ShieldCheck,
+            titulo: "Grupos de Acesso",
+            url: "/grupos-acesso",
           },
         ]
       : []),

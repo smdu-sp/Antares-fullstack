@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export type GrupoDev = {
   id: string;
@@ -235,7 +235,7 @@ export async function listarGruposDev(): Promise<{
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(`${baseURL}acessos-admin/dev/grupos`, {
@@ -280,7 +280,7 @@ export async function listarGruposUsuarioDev(usuarioId: string): Promise<{
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(
@@ -327,7 +327,7 @@ export async function atualizarGrupoUsuarioDev(
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(
@@ -369,7 +369,7 @@ export async function atualizarPermissoesGrupoUsuarioDev(
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(

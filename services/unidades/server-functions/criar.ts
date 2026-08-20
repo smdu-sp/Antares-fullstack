@@ -7,11 +7,11 @@ import { ICreateUnidade, IRespostaUnidade, IUnidade } from "@/types/unidade";
 import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function criar(data: ICreateUnidade): Promise<IRespostaUnidade> {
   const session = await auth();
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   if (!session) redirect("/login");
 
   const response: Response = await fetch(`${baseURL}unidades`, {

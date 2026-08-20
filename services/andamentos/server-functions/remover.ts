@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function remover(id: string): Promise<{
   ok: boolean;
@@ -22,7 +22,7 @@ export async function remover(id: string): Promise<{
 
   try {
     const response = await fetch(
-      `${getApiUrl()}andamentos/${id}`,
+      `${getInternalApiUrl()}andamentos/${id}`,
       {
         method: "DELETE",
         headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),

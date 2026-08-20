@@ -2,7 +2,7 @@
 
 import { IRespostaUsuario, IUsuario } from "@/types/usuario";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarPorId(
   id: string,
@@ -16,7 +16,7 @@ export async function buscarPorId(
       data: null,
       status: 400,
     };
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   try {
     const usuarios = await fetch(`${baseURL}usuarios/buscar-por-id/${id}`, {
       method: "GET",

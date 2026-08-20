@@ -2,7 +2,7 @@
 
 import { IPaginadoUnidade, IRespostaUnidade } from "@/types/unidade";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarTudo(
   access_token: string,
@@ -11,7 +11,7 @@ export async function buscarTudo(
   busca: string = "",
   grupoAtivoId?: string,
 ): Promise<IRespostaUnidade> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   try {
     const unidades = await fetch(
       `${baseURL}unidades?pagina=${pagina}&limite=${limite}&busca=${busca}`,

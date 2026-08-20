@@ -2,13 +2,13 @@
 
 import { IRespostaUnidade, IUnidade } from "@/types/unidade";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function listaCompleta(
   access_token: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaUnidade> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   try {
     const unidades = await fetch(`${baseURL}unidades/lista-completa`, {
       method: "GET",

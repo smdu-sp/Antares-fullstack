@@ -6,13 +6,13 @@ import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { IUnidade } from "@/types/unidade";
 import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function listarTodas(): Promise<IUnidade[]> {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(`${baseURL}unidades/lista-completa`, {
@@ -44,7 +44,7 @@ export async function reativarUnidade(
   const session = await auth();
   if (!session) redirect("/login");
 
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(`${baseURL}unidades/${id}/reativar`, {

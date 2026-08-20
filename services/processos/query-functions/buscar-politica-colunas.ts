@@ -5,13 +5,13 @@ import {
   IRespostaPoliticaColunasProcesso,
 } from "@/types/processo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarPoliticaColunas(
   access_token: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaPoliticaColunasProcesso> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response = await fetch(`${baseURL}processos/colunas/politica`, {

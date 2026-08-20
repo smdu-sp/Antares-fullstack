@@ -2,13 +2,13 @@
   <a href="https://www.prefeitura.sp.gov.br/cidade/secretarias/licenciamento/" target="blank"><img src="https://www.prefeitura.sp.gov.br/cidade/secretarias/upload/chamadas/URBANISMO_E_LICENCIAMENTO_HORIZONTAL_FUNDO_CLARO_1665756993.png" width="200" alt="SMUL Logo" /></a>
 </p>
 
-# Antares Frontend
+# Antares
 
 Sistema de gerenciamento de processos e andamentos - SMUL/ATIC
 
 ## 📋 Sobre o Projeto
 
-Sistema web para controle e acompanhamento de processos administrativos com funcionalidades avançadas:
+Aplicação **fullstack** em Next.js (App Router) para controle e acompanhamento de processos administrativos. Não há backend separado: Route Handlers e Server Actions falam direto com o banco via Prisma, no mesmo processo do Next.js.
 
 ### Processos e Andamentos
 - ✅ **Gestão Completa**: Criação, edição e acompanhamento de processos e andamentos
@@ -33,16 +33,21 @@ Sistema web para controle e acompanhamento de processos administrativos com func
 - 👤 **Perfil de Usuário**: Configurações individuais por usuário
 
 ### Segurança e Controle
-- 🔐 **Autenticação LDAP**: Login integrado com Active Directory
+- 🔐 **Autenticação LDAP**: Login integrado com Active Directory (`ENVIRONMENT=local` no `.env` pula o bind LDAP, útil em desenvolvimento)
+- 🔑 **Autorização por grupos**: permissão de sistema (`DEV` = acesso total; qualquer outra permissão depende 100% do papel real do usuário dentro do seu grupo ativo) + papel por grupo (ADM/TEC/USR) + capacidades granulares (visualizar/modificar/excluir) por vínculo usuário-grupo
 - 📝 **Sistema de Logs**: Auditoria completa de ações
-- 👥 **Gerenciamento de Usuários**: Controle de permissões e unidades
+- 👥 **Gerenciamento de Usuários e Grupos**: Controle de permissões, unidades e grupos de acesso (tela DEV em `/grupos-acesso`)
 
 ## 🚀 Tecnologias
 
 ### Core
-- **[Next.js 15](https://nextjs.org/)** - Framework React com App Router e Server Components
+- **[Next.js 15](https://nextjs.org/)** - Framework React com App Router, Server Components, Route Handlers e Server Actions
 - **[TypeScript](https://www.typescriptlang.org/)** - Tipagem estática e segurança de código
 - **[React 19](https://react.dev/)** - Biblioteca UI com hooks modernos
+
+### Dados
+- **[Prisma](https://www.prisma.io/)** - ORM sobre MySQL, usado diretamente pelos Route Handlers/Server Actions (sem API HTTP intermediária)
+- **MySQL** - Banco de dados relacional
 
 ### UI/UX
 - **[Shadcn/ui](https://ui.shadcn.com/)** - Componentes acessíveis e customizáveis
@@ -51,18 +56,22 @@ Sistema web para controle e acompanhamento de processos administrativos com func
 - **[Recharts](https://recharts.org/)** - Gráficos e visualizações de dados
 - **[Lucide React](https://lucide.dev/)** - Ícones modernos
 
-### Estado e Dados
+### Estado e Dados no cliente
 - **[TanStack Query](https://tanstack.com/query)** - Cache e sincronização de dados
 - **[React Hook Form](https://react-hook-form.com/)** - Gerenciamento de formulários
-- **[Zod](https://zod.dev/)** - Validação de schemas
+- **[Zod](https://zod.dev/)** - Validação de schemas (nos Route Handlers/Server Actions, porta dos antigos DTOs)
+
+### Exportação
+- **[ExcelJS](https://github.com/exceljs/exceljs)** / **[PDFKit](http://pdfkit.org/)** - Geração de planilhas e PDFs, chamados diretamente das Server Actions
 
 ### Autenticação
-- **[Auth.js v5](https://authjs.dev/)** - Autenticação com LDAP e sessões seguras
+- **[Auth.js v5](https://authjs.dev/)** - Sessão JWT, com LDAP (`ldapts`) para bind de login e busca de usuários
 
 ## 📦 Pré-requisitos
 
-- Node.js 18+ ou Bun
-- Backend da aplicação rodando (consulte repositório do backend)
+- Node.js 18+
+- MySQL acessível (localmente, geralmente via Docker) apontado por `DATABASE_URL`
+- Acesso ao LDAP/AD (produção) — em desenvolvimento, `ENVIRONMENT=local` dispensa isso
 
 ## 🔧 Instalação
 
@@ -77,39 +86,55 @@ cd Antares-frontend
 
 ```bash
 npm install
-# ou
-bun install
 ```
 
 3. **Configure as variáveis de ambiente**
 
 ```bash
-copy example.env .env.local
+copy example.env .env
 ```
 
-Edite o arquivo `.env.local`:
+Edite o `.env` — principais variáveis:
 
 ```properties
 # Nome do projeto
 NEXT_PUBLIC_PROJECT_NAME="Sistema Antares"
 
-# URL do backend (ajuste conforme necessário)
-NEXT_PUBLIC_API_URL=http://localhost:3000/
+# Segredo de autenticação do NextAuth (gere um novo, veja abaixo)
+AUTH_SECRET=
 
-# Segredo de autenticação (gere um novo)
-AUTH_SECRET=seu_secret_aqui
-
-# URL do frontend
+# URL do próprio frontend
 AUTH_URL=http://localhost:3001
+
+# Banco de dados
+DATABASE_URL="mysql://user:pass@localhost:3306/antares"
+
+# JWT legado (par de tokens de acesso/refresh usado pelas chamadas internas
+# de services/* aos Route Handlers em app/api/**)
+JWT_SECRET=
+RT_SECRET=
+
+# LDAP/AD — "local" pula o bind LDAP no login (usa só a senha cadastrada localmente)
+ENVIRONMENT=local
+LDAP_SERVER=
+LDAP_DOMAIN=
+LDAP_BASE=
+USER_LDAP=
+PASS_LDAP=
 ```
 
-4. **Gere um AUTH_SECRET**
+4. **Gere um `AUTH_SECRET`**
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Copie o código gerado para o campo `AUTH_SECRET` no arquivo `.env.local`
+5. **Prepare o banco**
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
 
 ## 🎯 Executando a Aplicação
 
@@ -117,104 +142,106 @@ Copie o código gerado para o campo `AUTH_SECRET` no arquivo `.env.local`
 
 ```bash
 npm run dev
-# ou
-bun dev
 ```
 
 Acesse [http://localhost:3001](http://localhost:3001)
 
-### Build de Produção    # Rotas protegidas (requer autenticação)
-│   ├── page.tsx               # Dashboard com métricas e grid de processos
-│   ├── processos/             # Gestão de processos e andamentos
-│   ├── interessados/          # Cadastro de interessados
-│   ├── usuarios/              # Gerenciamento de usuários
-│   ├── unidades/              # Cadastro de unidades
-│   ├── perfil/                # Perfil e configurações do usuário
-│   └── logs/                  # Logs e auditoria do sistema
-├── (rotas-livres)/            # Rotas públicas
-│   └── login/                 # Página de autenticação LDAP
-└── api/auth/                  # Endpoints de autenticação
+### Build de Produção
+
+```bash
+npm run build
+npm start
+```
+
+## 📁 Estrutura do Projeto
+
+```
+app/
+├── (rotas-auth)/               # Rotas protegidas (requer autenticação)
+│   ├── page.tsx                 # Dashboard com métricas e grid de processos
+│   ├── processos/                # Gestão de processos e andamentos
+│   ├── interessados/             # Cadastro de interessados
+│   ├── usuarios/                 # Gerenciamento de usuários
+│   ├── unidades/                 # Cadastro de unidades
+│   ├── grupos-acesso/             # Tela DEV: grupos, vínculos processo-grupo, matriz de permissões
+│   ├── perfil/                   # Perfil e configurações do usuário
+│   └── logs/                     # Logs e auditoria do sistema
+├── (rotas-livres)/              # Rotas públicas
+│   └── login/                    # Página de autenticação
+└── api/                         # Route Handlers — 1:1 com a antiga API do backend,
+                                   # chamam lib/server/**/*.ts (Prisma direto)
 
 components/
-├── ui/                        # Primitivos Shadcn/ui
-├── sidebar/                   # Navegação e menu lateral
-├── charts/                    # Componentes de gráficos (Recharts)
-├── processos-spreadsheet.tsx  # Grid principal AG-Grid
-├── export-*.tsx               # Botões de exportação (individual/lote)
-├── avatar-uploader.tsx        # Upload de avatar de usuário
-└── filtros.tsx                # Componente de busca e filtros
+├── ui/                          # Primitivos Shadcn/ui
+├── sidebar/                     # Navegação e menu lateral
+├── charts/                      # Componentes de gráficos (Recharts)
+├── processos-spreadsheet.tsx    # Grid principal AG-Grid
+├── export-*.tsx                 # Botões de exportação (individual/lote)
+├── avatar-uploader.tsx          # Upload de avatar de usuário
+└── filtros.tsx                  # Componente de busca e filtros
 
-services/
-├── processos/
-│   ├── query-functions/       # Funções de busca e contagem
-│   └── server-functions/      # Funções de criação/edição
-├── andamentos/                # CRUD de andamentos
-├── export/                    # ⭐ Exportação Excel/PDF
-├── preferencias/              # ⭐ Persistência de preferências do usuário
-├── usuarios/                  # Gerenciamento de usuários
-├── unidades/                  # CRUD de unidades
-├── interessados/              # CRUD de interessados
-└── logs/                      # Sistema de logs
-
-hooks/
-├── use-mobile.ts              # Detecção de dispositivos móveis
-└── use-selected-processos.ts  # ⭐ Gerenciamento de seleção múltipla
+services/<dominio>/
+├── query-functions/             # Leitura, chamam app/api/** (same-origin)
+├── server-functions/            # Escrita, idem
+└── client-functions/            # Helpers client-side (ex.: download de blob)
 
 lib/
-├── auth/                      # Configuração NextAuth + LDAP
-│   ├── auth.ts                # Autenticação principal
-│   └── auth.config.ts         # Configuração de providers
-└── utils.ts                   # Utilitários (cn, formatadores)
+├── auth/
+│   ├── auth.ts                  # Instância NextAuth completa (Node: Server Components/Actions/Route Handlers)
+│   ├── auth.node.config.ts       # Config completa (Prisma, LDAP, resolução de grupo ativo)
+│   ├── auth.middleware.ts        # Instância NextAuth exclusiva do middleware (Edge Runtime)
+│   └── auth.config.ts            # Config leve Edge-safe (sem Prisma/LDAP)
+├── server/
+│   ├── auth/                    # requireAuth/requirePermissoes/requireCapacidade (porte dos guards)
+│   ├── <dominio>/                # Lógica de negócio por domínio, chamada pelos Route Handlers
+│   └── validation/                # Schemas Zod por domínio
+├── prisma.ts                    # Singleton do Prisma Client
+└── access-control.ts             # canRead/canEdit/canAdmin (usados pela UI e pelo middleware)
 
 types/
-├── processo.ts                # Tipos de processos e andamentos
-├── usuario.ts                 # Tipos de usuários
-├── unidade.ts                 # Tipos de unidades
-├── inFuncionalidades Principais
+├── processo.ts                  # Tipos de processos e andamentos
+├── usuario.ts                   # Tipos de usuários
+├── unidade.ts                   # Tipos de unidades
+└── grupo.ts / grupo-ativo.ts     # Tipos do modelo de grupos/permissões
 
-### Grid de Processos (AG-Grid)
-- **Edição Inline**: Clique duplo para editar células diretamente
-- **Expansão de Detalhes**: Botão para expandir/colapsar andamentos
-- **Ordenação e Filtros**: Clique nos cabeçalhos para ordenar
-- **Redimensionamento**: Arraste bordas das colunas para ajustar largura
-- **Reordenação**: Arraste cabeçalhos para reorganizar colunas
-- **Persistência**: Ordem e tamanho salvos automaticamente no banco
+prisma/
+├── schema.prisma                # Schema do banco
+└── migrations/                   # Histórico de migrações
+```
 
-### Seleção e Operações em Lote
-- **Checkbox Individual**: Selecionar processos específicos
-- **Selecionar Todos**: Checkbox no cabeçalho da coluna
-- **Exportar Selecionados**: 6 opções de exportação
-  - Processo + Andamentos (Excel/PDF)
-  - Apenas Processo (Excel/PDF)
-  - Apenas Andamentos (Excel/PDF)
-- **Toggle Incluir Andamentos**: Controle fino sobre o conteúdo exportado
+## 🔐 Modelo de autorização
 
-### Edição em Lote de Andamentos
-Operações simultâneas em múltiplos andamentos na tela de detalhes do processo:
-- ✅ Marcar como concluído
-- ⏰ Prorrogar prazo (com seleção de data)
-- Verifique se `NEXT_PUBLIC_API_URL` está correto no `.env.local`
-- Remova barra final da URL (ex: `http://localhost:8080` sem `/` no final)
-- Confirme se o backend está rodando na porta correta
+Três camadas, checadas nessa ordem em cada Route Handler:
+
+1. **Permissão de sistema** (`usuario.permissao`): só `DEV` tem bypass total (acesso a tudo, em qualquer grupo). As demais (`ADM`/`TEC`/`USR`) não têm nenhum privilégio especial de sistema — todo o resto do acesso vem exclusivamente do papel do usuário dentro do seu **grupo ativo**.
+2. **Papel no grupo ativo** (`usuario_grupo.permissao_grupo`: `ADM`/`TEC`/`USR`) — verificado por `requirePermissoes()`.
+3. **Capacidades granulares** por vínculo usuário-grupo (`visualizar_proprios`/`visualizar_grupo`/`modificar_proprios`/`modificar_grupo`/`excluir`) — verificadas por `requireCapacidade()`. O grupo `GABINETE` tem uma regra especial: `visualizar_grupo` dá visibilidade global de processos, não só do próprio grupo.
+
+O "grupo ativo" (qual dos grupos do usuário está em uso na sessão) é resolvido em `lib/server/auth/obter-grupo-ativo.ts` e persistido tanto em `preferencias_usuario` (chave `auth.grupo_ativo_id`) quanto no próprio cookie de sessão (via callback `jwt()`), para que o middleware (Edge Runtime, sem acesso a Prisma) consiga tomar decisões de autorização sem nenhuma chamada de rede.
+
+Usuários com permissão `DEV` são automaticamente vinculados a um grupo técnico interno ("Grupo DEV") só para satisfazer telas que exigem um grupo ativo resolvido — esse vínculo não concede nenhuma autorização extra, o bypass de `DEV` já é incondicional.
+
+## 🩺 Resolução de problemas comuns
 
 **Preferências não salvam:**
 - Verifique se o usuário está autenticado corretamente
-- Confirme que a tabela `preferencias_usuario` existe no banco
-- Verifique logs do backend para erros na API `/preferencias`
+- Confirme que a tabela `preferencias_usuario` existe no banco (`npx prisma migrate status`)
 
 **Exportação não funciona:**
-- Confirme que os endpoints `/export/processos/*` e `/export/andamentos/*` estão ativos no backend
+- Verifique o console do servidor (`npm run dev`) por erros do ExcelJS/PDFKit
 - Verifique se o navegador não está bloqueando downloads
-- Para exportações grandes, aguarde o processamento (pode demorar alguns segundos)
+
+**Login falha:**
+- Em desenvolvimento, confirme `ENVIRONMENT=local` no `.env` se não tiver LDAP configurado
+- Em produção, confirme `LDAP_SERVER`/`LDAP_DOMAIN`/`LDAP_BASE`/`USER_LDAP`/`PASS_LDAP`
 
 ## 📝 Scripts Disponíveis
 
 ```bash
 npm run dev        # Desenvolvimento com hot-reload (porta 3001)
 npm run build      # Build de produção com otimizações
-npm start          # Servidor de produção
-npm run lint       # Executa ESLint
-npm run lint:fix   # Corrige problemas automaticamente
+npm start           # Servidor de produção (porta 3201)
+npm run lint        # Executa ESLint
 ```
 
 ## 🔄 Fluxo de Deploy
@@ -224,51 +251,8 @@ npm run lint:fix   # Corrige problemas automaticamente
 3. Teste localmente com `npm start`
 4. Faça commit e push para o repositório
 5. Configure variáveis de ambiente no servidor de produção
-6. Execute build e start no servidor
-
-## 🌐 Endpoints Backend Necessários
-
-O frontend espera que os seguintes endpoints estejam disponíveis:
-
-### Processos
-- `GET /processos` - Listar com paginação e filtros
-- `GET /processos/:id` - Buscar por ID
-- `POST /processos` - Criar novo
-- `PUT /processos/:id` - Atualizar
-- `DELETE /processos/:id` - Soft delete
-- `GET /processos/contar/total` - Contar todos
-- `GET /processos/contar/em-andamento` - Contar em andamento
-- `GET /processos/contar/vencendo-hoje` - Contar vencendo hoje
-- `GET /processos/contar/atrasados` - Contar atrasados
-- `GET /processos/contar/concluidos` - Contar concluídos
-
-### Andamentos
-- `GET /andamentos` - Listar todos
-- `GET /andamentos/processo/:id` - Buscar por processo
-- `POST /andamentos` - Criar novo
-- `PUT /andamentos/:id` - Atualizar
-- `DELETE /andamentos/:id` - Excluir
-- `PATCH /andamentos/lote/concluir` - Concluir em lote
-- `PATCH /andamentos/lote/prorrogar` - Prorrogar em lote
-- `DELETE /andamentos/lote` - Excluir em lote
-
-### Exportação
-- `POST /export/processos/excel` - Exportar processos Excel
-- `POST /export/processos/pdf` - Exportar processos PDF
-- `POST /export/andamentos/excel` - Exportar andamentos Excel
-- `POST /export/andamentos/pdf` - Exportar andamentos PDF
-
-### Preferências
-- `GET /preferencias/:chave` - Buscar preferência
-- `POST /preferencias` - Salvar preferência
-- `GET /preferencias` - Listar todas
-- `DELETE /preferencias/:id` - Excluir preferência
-
-### Outros
-- `GET /usuarios` - Gerenciamento de usuários
-- `GET /unidades` - Gerenciamento de unidades
-- `GET /interessados` - Gerenciamento de interessados
-- `GET /logs` - Sistema de logs
+6. Rode `npx prisma migrate deploy` antes de subir a nova versão, se houver migração pendente
+7. Execute build e start no servidor
 
 ## 🤝 Contribuindo
 
@@ -282,8 +266,7 @@ O frontend espera que os seguintes endpoints estejam disponíveis:
 **Convenções:**
 - Use TypeScript para novos arquivos
 - Siga os padrões de código existentes
-- Adicione comentários em código complexo
-- Teste todas as funcionalidades antes do PR
+- Ao portar/alterar lógica de autorização, verifique as três camadas descritas acima
 
 ## 📄 Licença
 
@@ -299,5 +282,5 @@ Para dúvidas, problemas ou sugestões:
 
 ---
 
-**Última atualização:** Fevereiro/2026  
-**Versão:** 1.0.0
+**Última atualização:** Agosto/2026
+**Versão:** 2.0.0 (fullstack)

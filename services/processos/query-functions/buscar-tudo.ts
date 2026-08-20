@@ -2,7 +2,7 @@
 
 import { IPaginadoProcesso, IRespostaProcesso } from "@/types/processo";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarTudo(
   access_token: string,
@@ -19,7 +19,7 @@ export async function buscarTudo(
   // (ex.: total geral do dashboard). A busca do usuário deve sempre usar no-store.
   permitirCache: boolean = false,
 ): Promise<IRespostaProcesso> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   try {
     const params = new URLSearchParams({
       pagina: pagina.toString(),

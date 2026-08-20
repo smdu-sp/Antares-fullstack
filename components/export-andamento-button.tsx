@@ -40,7 +40,13 @@ export function ExportAndamentoButton({ andamentoId }: { andamentoId: string }) 
         const timestamp = new Date().toISOString().split('T')[0];
         const filename = `andamento_${andamentoId}_${timestamp}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
         downloadBlob(result.blob, filename);
-        toast.success(`Andamento exportado para ${format.toUpperCase()}`);
+        if (result.aviso) {
+          toast.warning(`Andamento exportado para ${format.toUpperCase()}`, {
+            description: result.aviso,
+          });
+        } else {
+          toast.success(`Andamento exportado para ${format.toUpperCase()}`);
+        }
       } else {
         toast.error(result.error || 'Erro ao exportar andamento');
       }

@@ -7,12 +7,12 @@ import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { IRespostaUnidade } from "@/types/unidade";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function remover(id: string): Promise<IRespostaUnidade> {
   const session = await auth();
   if (!session) redirect("/login");
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
 
   try {
     const response: Response = await fetch(`${baseURL}unidades/${id}`, {

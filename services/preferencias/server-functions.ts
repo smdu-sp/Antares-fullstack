@@ -7,9 +7,9 @@ import type {
   CriarPreferenciaDTO,
   AtualizarPreferenciaDTO,
 } from "@/types/preferencia";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
-const API_URL = getApiUrl().replace(/\/$/, "");
+const API_URL = getInternalApiUrl().replace(/\/$/, "");
 
 /**
  * Buscar uma preferência específica por chave

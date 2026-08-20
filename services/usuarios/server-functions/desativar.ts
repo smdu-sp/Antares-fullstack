@@ -6,12 +6,12 @@ import { auth } from "@/lib/auth/auth";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
 import { revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function desativar(id: string) {
   const session = await auth();
   if (!session) redirect("/login");
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   const desativado = await fetch(`${baseURL}usuarios/desativar/${id}`, {
     method: "DELETE",
     headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),

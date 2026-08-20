@@ -74,7 +74,13 @@ export function ExportProcessosEmLote({
         const timestamp = new Date().toISOString().split('T')[0];
         const filename = `processos_${timestamp}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
         downloadBlob(result.blob, filename);
-        toast.success(`Processos exportados para ${format.toUpperCase()}`);
+        if (result.aviso) {
+          toast.warning(`Processos exportados para ${format.toUpperCase()}`, {
+            description: result.aviso,
+          });
+        } else {
+          toast.success(`Processos exportados para ${format.toUpperCase()}`);
+        }
       } else {
         toast.error(result.error || 'Erro ao exportar processos');
       }

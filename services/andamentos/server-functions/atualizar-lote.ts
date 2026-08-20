@@ -7,7 +7,7 @@ import { IRespostaAndamento } from "@/types/processo";
 import { auth } from "@/lib/auth/auth";
 import { revalidateTag } from "next/cache";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function atualizarLote(data: {
   ids: string[];
@@ -16,7 +16,7 @@ export async function atualizarLote(data: {
 }): Promise<IRespostaAndamento> {
   try {
     const session = await auth();
-    const baseURL = getApiUrl();
+    const baseURL = getInternalApiUrl();
     if (!session) {
       redirect("/login");
     }

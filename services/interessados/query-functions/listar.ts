@@ -2,9 +2,9 @@
 
 import { IInteressado } from "@/types/interessado";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
-const BACKEND = getApiUrl();
+const BACKEND = getInternalApiUrl();
 
 export async function listar(token: string, grupoAtivoId?: string) {
   try {

@@ -20,49 +20,26 @@ type UsuarioLike =
   | null
   | undefined;
 
-function isGrupoGlobalAtivo(grupoAtivo?: IGrupoAtivo): boolean {
-  if (!grupoAtivo) return false;
-
-  const sigla = (grupoAtivo.sigla || "").toString().trim().toUpperCase();
-  const nome = (grupoAtivo.nome || "").toString().trim().toUpperCase();
-
-  return sigla === "GLOBAL" || nome === "GLOBAL";
-}
-
-export function isGlobalMaster(usuario: UsuarioLike): boolean {
-  const sessao = usuario as SessionLike;
-  return isGrupoGlobalAtivo(sessao?.grupoAtivo);
+// Mapeia o papel real dentro do grupo (`usuario_grupo.permissao_grupo`: ADM/TEC/USR)
+// para o mesmo vocabulário de bucket usado pelas checagens de UI (ADMINISTRADOR/
+// EDITOR/LEITOR). É o papel de grupo — não a permissão de sistema — que decide isso.
+function mapearPapelGrupo(papel: string): string | null {
+  if (papel === "ADM") return "ADMINISTRADOR";
+  if (papel === "TEC") return "EDITOR";
+  if (papel === "USR") return "LEITOR";
+  return null;
 }
 
 function getPermissaoCoordenadoriaDoGrupo(
   grupoAtivo?: IGrupoAtivo,
 ): string | null {
-  if (!grupoAtivo) return null;
-
-  const grupo = grupoAtivo as unknown as {
-    permissaoEfetiva?: unknown;
-    permissaoCoordenadoria?: unknown;
-    membroAtivo?: { permissaoCoordenadoria?: unknown; permissao?: unknown };
-  };
-
-  const permissaoDireta =
-    (typeof grupo.permissaoEfetiva === "string" && grupo.permissaoEfetiva) ||
-    (typeof grupo.permissaoCoordenadoria === "string" &&
-      grupo.permissaoCoordenadoria) ||
-    (typeof grupo.membroAtivo?.permissaoCoordenadoria === "string" &&
-      grupo.membroAtivo.permissaoCoordenadoria) ||
-    (typeof grupo.membroAtivo?.permissao === "string" &&
-      grupo.membroAtivo.permissao);
-
-  if (!permissaoDireta) return null;
-  return permissaoDireta.toUpperCase();
+  const papel = grupoAtivo?.membroAtivo?.permissao;
+  if (!papel) return null;
+  return mapearPapelGrupo(papel);
 }
 
 export function getPermissaoCoordenadoria(usuario: UsuarioLike): string {
   const sessao = usuario as SessionLike;
-  if (isGrupoGlobalAtivo(sessao?.grupoAtivo)) {
-    return "ADMINISTRADOR";
-  }
 
   const permissaoDoGrupo = getPermissaoCoordenadoriaDoGrupo(sessao?.grupoAtivo);
   if (permissaoDoGrupo) {
@@ -76,7 +53,9 @@ export function getPermissaoCoordenadoria(usuario: UsuarioLike): string {
   const permissao =
     sessao?.usuario?.permissao?.toString() ||
     usuarioDireto?.permissao?.toString();
-  if (permissao === "DEV" || permissao === "ADM") return "ADMINISTRADOR";
+  // Só DEV tem bypass de sistema — qualquer outro papel (inclusive ADM) precisa vir
+  // de um vínculo de grupo real, resolvido acima via getPermissaoCoordenadoriaDoGrupo().
+  if (permissao === "DEV") return "ADMINISTRADOR";
   if (permissao === "TEC") return "EDITOR";
   return "LEITOR";
 }
@@ -87,20 +66,17 @@ export function hasGrupoAtivo(usuario: UsuarioLike): boolean {
 }
 
 export function canRead(usuario: UsuarioLike): boolean {
-  if (isGlobalMaster(usuario)) return true;
   return ["LEITOR", "EDITOR", "ADMINISTRADOR"].includes(
     getPermissaoCoordenadoria(usuario),
   );
 }
 
 export function canEdit(usuario: UsuarioLike): boolean {
-  if (isGlobalMaster(usuario)) return true;
   return ["EDITOR", "ADMINISTRADOR"].includes(
     getPermissaoCoordenadoria(usuario),
   );
 }
 
 export function canAdmin(usuario: UsuarioLike): boolean {
-  if (isGlobalMaster(usuario)) return true;
   return getPermissaoCoordenadoria(usuario) === "ADMINISTRADOR";
 }

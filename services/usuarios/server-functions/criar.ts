@@ -7,11 +7,11 @@ import { ICreateUsuario, IRespostaUsuario, IUsuario } from "@/types/usuario";
 import { auth } from "@/lib/auth/auth";
 import { revalidateTag } from "next/cache";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function criar(data: ICreateUsuario): Promise<IRespostaUsuario> {
   const session = await auth();
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   if (!session) redirect("/login");
 
   const response: Response = await fetch(`${baseURL}usuarios/criar`, {

@@ -1,7 +1,7 @@
 ﻿/** @format */
 
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function contarAtrasados(
   access_token: string,
@@ -12,7 +12,7 @@ export async function contarAtrasados(
   data: number | null;
   status: number;
 }> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   try {
     const response = await fetch(`${baseURL}processos/contar/atrasados`, {
       method: "GET",

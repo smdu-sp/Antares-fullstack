@@ -1,7 +1,7 @@
 ﻿/** @format */
 
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function contarConcluidos(
   token: string,
@@ -9,7 +9,7 @@ export async function contarConcluidos(
 ): Promise<{ ok: boolean; data: number | null; error: string | null }> {
   try {
     const response = await fetch(
-      `${getApiUrl()}processos/contar/concluidos`,
+      `${getInternalApiUrl()}processos/contar/concluidos`,
       {
         headers: buildAuthHeaders(token, grupoAtivoId),
         next: { tags: ["processos"], revalidate: 60 },
@@ -27,7 +27,7 @@ export async function contarConcluidos(
     const data = await response.json();
     return {
       ok: true,
-      data: typeof data === "number" ? data : data.count || 0,
+      data: typeof data === "number" ? data : data.total || 0,
       error: null,
     };
   } catch (error) {

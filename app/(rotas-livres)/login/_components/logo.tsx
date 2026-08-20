@@ -17,7 +17,7 @@ export default function Logo() {
         return <Image
             width={1200}
             height={1200}
-            src={"smul_branco.png"}
+            src={"/smul_branco.png"}
             alt="SMUL LOGO"
         />
     }
@@ -25,7 +25,7 @@ export default function Logo() {
     return <Image
         width={1200}
         height={1200}
-        src={tema === "dark" ? "smul_branco.png" : "smul_azul.png"}
+        src={tema === "dark" ? "/smul_branco.png" : "/smul_azul.png"}
         alt="SMUL LOGO"
     />
 }

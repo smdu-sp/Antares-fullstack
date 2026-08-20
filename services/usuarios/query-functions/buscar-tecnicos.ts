@@ -2,13 +2,13 @@
 
 import { IRespostaUsuario, IUsuarioTecnico } from "@/types/usuario";
 import { buildAuthHeaders } from "@/lib/http/auth-headers";
-import { getApiUrl } from "@/lib/http/get-api-url";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
 export async function buscarTecnicos(
   access_token: string,
   grupoAtivoId?: string,
 ): Promise<IRespostaUsuario> {
-  const baseURL = getApiUrl();
+  const baseURL = getInternalApiUrl();
   try {
     const usuarioNovo = await fetch(`${baseURL}usuarios/buscar-tecnicos`, {
       method: "GET",

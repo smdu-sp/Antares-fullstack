@@ -10,11 +10,11 @@ export interface IGrupoAtivo {
   id: string;
   nome: string;
   sigla?: string;
-  permissaoEfetiva?: string;
-  permissaoCoordenadoria?: string;
+  codigo?: string;
+  // Papel real do usuário dentro deste grupo (`usuario_grupo.permissao_grupo`:
+  // "ADM" | "TEC" | "USR") — usado por getPermissaoCoordenadoria() em access-control.ts.
   membroAtivo?: {
     permissao?: string;
-    permissaoCoordenadoria?: string;
   };
   gruposDisponiveis?: IGrupoDisponivel[];
 }

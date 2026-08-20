@@ -1,6 +1,6 @@
 /** @format */
 
-import { auth } from "@/lib/auth/auth";
+import { auth } from "@/lib/auth/auth.middleware";
 import { canAdmin, getPermissaoCoordenadoria } from "@/lib/access-control";
 import { NextResponse } from "next/server";
 
@@ -8,14 +8,9 @@ export async function middleware(request: any) {
   const session = await auth();
 
   // Rotas que requerem DEV e ADM
-  const adminRoutes = [
-    "/unidades",
-    "/interessados",
-    "/usuarios",
-    "/coordenadorias",
-  ];
+  const adminRoutes = ["/unidades", "/interessados", "/usuarios"];
   // Rotas que requerem apenas DEV
-  const devOnlyRoutes = ["/logs"];
+  const devOnlyRoutes = ["/logs", "/grupos-acesso"];
 
   const pathname = request.nextUrl.pathname;
 
