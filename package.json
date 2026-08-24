@@ -13,10 +13,10 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@hookform/resolvers": "^4.1.2",
-    "@prisma/client": "^6.5.0",
     "@mui/icons-material": "^5.18.0",
     "@mui/material": "^5.18.0",
     "@mui/x-date-pickers": "^6.20.2",
+    "@prisma/client": "^6.5.0",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -79,7 +79,15 @@
     "zod": "^3.24.2"
   },
   "overrides": {
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "ldapts": {
+      "uuid": "^11.1.1"
+    },
+    "exceljs": {
+      "uuid": "^11.1.1"
+    },
+    "sharp": "^0.35.0",
+    "deepmerge-ts": "^8.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -94,5 +102,11 @@
     "prisma": "^6.5.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "prisma@6.19.3": true,
+    "sharp@0.34.5": true
   }
 }
