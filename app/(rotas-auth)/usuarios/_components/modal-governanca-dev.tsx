@@ -2,6 +2,7 @@
 
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,18 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { MultiSelect } from "@/components/multi-select";
 import {
   listarGruposDev,
   listarGruposUsuarioDev,
+  listarPermissoesDev,
   atualizarGrupoUsuarioDev,
   atualizarPermissoesGrupoUsuarioDev,
+  atualizarPermissoesGlobaisUsuarioDev,
   type GrupoDev,
-  type GrupoUsuarioDev,
+  type Papel,
+  type PermissaoDev,
 } from "@/services/acessos-admin";
 import { IUsuario } from "@/types/usuario";
-import { Loader2, Settings2 } from "lucide-react";
+import { Loader2, RotateCcw, Settings2, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -39,481 +42,364 @@ type Props = {
   user: IUsuario;
 };
 
-function inferGrupoInicial(user: IUsuario): string {
-  const raw = user as unknown as {
-    grupoId?: string;
-    grupo_id?: string;
-    grupos?: Array<{ id?: string }>;
-  };
-
-  return raw.grupoId || raw.grupo_id || raw.grupos?.[0]?.id || "";
-}
-
-function inferGruposIniciais(user: IUsuario): string[] {
-  const raw = user as unknown as {
-    grupoId?: string;
-    grupo_id?: string;
-    grupos?: Array<{ id?: string }>;
-  };
-
-  if (Array.isArray(raw.grupos) && raw.grupos.length > 0) {
-    return raw.grupos
-      .map((g) => g.id)
-      .filter((id): id is string => Boolean(id));
-  }
-
-  if (raw.grupoId) return [raw.grupoId];
-  if (raw.grupo_id) return [raw.grupo_id];
-  return [];
-}
+type Linha = {
+  grupoId: string;
+  nome: string;
+  sigla?: string;
+  papel: Papel;
+  permissoesExtras: string[];
+  novo: boolean;
+  removida: boolean;
+};
 
 export default function ModalGovernancaDev({ user }: Props) {
   const [open, setOpen] = useState(false);
+  const [carregando, setCarregando] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [grupos, setGrupos] = useState<GrupoDev[]>([]);
-  const [vinculosPorGrupo, setVinculosPorGrupo] = useState<
-    Record<string, GrupoUsuarioDev>
-  >({});
-  const [grupoId, setGrupoId] = useState("");
-  const [gruposSelecionados, setGruposSelecionados] = useState<string[]>([]);
-  const [gruposPersistidos, setGruposPersistidos] = useState<string[]>([]);
-  const [permissaoGrupo, setPermissaoGrupo] = useState<"ADM" | "TEC" | "USR">(
-    "USR",
-  );
-  const [visualizarProprios, setVisualizarProprios] = useState(false);
-  const [visualizarGrupo, setVisualizarGrupo] = useState(false);
-  const [modificarProprios, setModificarProprios] = useState(false);
-  const [modificarGrupo, setModificarGrupo] = useState(false);
-  const [excluir, setExcluir] = useState(false);
 
-  const payloadCapacidades = useMemo(
-    () => ({
-      visualizar_proprios: visualizarProprios,
-      visualizar_grupo: visualizarGrupo,
-      modificar_proprios: modificarProprios,
-      modificar_grupo: modificarGrupo,
-      excluir,
-      ativo: true,
-    }),
-    [
-      visualizarProprios,
-      visualizarGrupo,
-      modificarProprios,
-      modificarGrupo,
-      excluir,
-    ],
+  const [todosGrupos, setTodosGrupos] = useState<GrupoDev[]>([]);
+  const [permissoesCatalogo, setPermissoesCatalogo] = useState<PermissaoDev[]>(
+    [],
+  );
+  const [linhas, setLinhas] = useState<Linha[]>([]);
+  const [permissoesGlobais, setPermissoesGlobais] = useState<string[]>([]);
+  const [grupoParaAdicionar, setGrupoParaAdicionar] = useState("");
+
+  const opcoesPermissoes = useMemo(
+    () =>
+      permissoesCatalogo.map((permissao) => ({
+        value: permissao.codigo,
+        label: permissao.descricao || permissao.codigo,
+      })),
+    [permissoesCatalogo],
   );
 
-  const aplicarEstadoDoGrupo = (
-    grupoSelecionadoId: string,
-    mapa: Record<string, GrupoUsuarioDev>,
-  ) => {
-    const vinculo = mapa[grupoSelecionadoId];
-    setPermissaoGrupo(vinculo?.permissaoGrupo || "USR");
-    setVisualizarProprios(Boolean(vinculo?.capacidades?.visualizar_proprios));
-    setVisualizarGrupo(Boolean(vinculo?.capacidades?.visualizar_grupo));
-    setModificarProprios(Boolean(vinculo?.capacidades?.modificar_proprios));
-    setModificarGrupo(Boolean(vinculo?.capacidades?.modificar_grupo));
-    setExcluir(Boolean(vinculo?.capacidades?.excluir));
-  };
+  const descricaoPermissao = (codigo: string) =>
+    permissoesCatalogo.find((p) => p.codigo === codigo)?.descricao || codigo;
 
-  useEffect(() => {
-    if (!open) return;
-
+  const carregar = () => {
     startTransition(async () => {
-      const [gruposResp, gruposUsuarioResp] = await Promise.all([
+      const [gruposResp, vinculosResp, permissoesResp] = await Promise.all([
         listarGruposDev(),
         listarGruposUsuarioDev(user.id),
+        listarPermissoesDev(),
       ]);
 
       if (gruposResp.ok && gruposResp.data) {
-        setGrupos(gruposResp.data);
-      }
-
-      if (!gruposResp.ok) {
+        setTodosGrupos(gruposResp.data);
+      } else {
         toast.error("Erro ao carregar grupos", {
           description: gruposResp.error || undefined,
         });
       }
 
-      const fallbackGroups = inferGruposIniciais(user);
-
-      if (gruposUsuarioResp.ok && gruposUsuarioResp.data) {
-        const mapa = gruposUsuarioResp.data.reduce<
-          Record<string, GrupoUsuarioDev>
-        >((acc, item) => {
-          acc[item.grupoId] = item;
-          return acc;
-        }, {});
-
-        setVinculosPorGrupo(mapa);
-
-        const ativos = gruposUsuarioResp.data
-          .filter((v) => v.ativo)
-          .map((v) => v.grupoId);
-        const selecionados = ativos.length > 0 ? ativos : fallbackGroups;
-        setGruposSelecionados(selecionados);
-        setGruposPersistidos(ativos);
-        const grupoInicial = selecionados[0] || inferGrupoInicial(user);
-        setGrupoId(grupoInicial);
-        if (grupoInicial) {
-          aplicarEstadoDoGrupo(grupoInicial, mapa);
-        }
+      if (permissoesResp.ok && permissoesResp.data) {
+        setPermissoesCatalogo(permissoesResp.data);
       } else {
-        setGruposSelecionados(fallbackGroups);
-        setGruposPersistidos(fallbackGroups);
-        setVinculosPorGrupo({});
-        const grupoInicial = fallbackGroups[0] || inferGrupoInicial(user);
-        setGrupoId(grupoInicial);
+        toast.error("Erro ao carregar permissões", {
+          description: permissoesResp.error || undefined,
+        });
       }
 
-      if (!gruposUsuarioResp.ok) {
+      if (vinculosResp.ok && vinculosResp.data) {
+        const novasLinhas: Linha[] = vinculosResp.data
+          .filter((v) => v.ativo)
+          .map((v) => ({
+            grupoId: v.grupoId,
+            nome: v.nome,
+            sigla: v.sigla,
+            papel: v.permissaoGrupo || "USR",
+            permissoesExtras: v.permissoes,
+            novo: false,
+            removida: false,
+          }));
+
+        setLinhas(novasLinhas);
+        setPermissoesGlobais(vinculosResp.permissoesGlobais);
+      } else {
         toast.error("Erro ao carregar grupos do usuário", {
-          description: gruposUsuarioResp.error || undefined,
+          description: vinculosResp.error || undefined,
         });
-      }
-    });
-  }, [open, user]);
-
-  useEffect(() => {
-    if (!grupoId) return;
-    aplicarEstadoDoGrupo(grupoId, vinculosPorGrupo);
-  }, [grupoId, vinculosPorGrupo]);
-
-  const vincularGrupos = () => {
-    if (gruposSelecionados.length === 0) {
-      toast.error("Selecione ao menos um grupo para vincular");
-      return;
-    }
-
-    startTransition(async () => {
-      const setSelecionados = new Set(gruposSelecionados);
-      const setPersistidos = new Set(gruposPersistidos);
-
-      const paraAtivar = gruposSelecionados.filter(
-        (id) => !setPersistidos.has(id),
-      );
-      const paraDesativar = gruposPersistidos.filter(
-        (id) => !setSelecionados.has(id),
-      );
-
-      if (paraAtivar.length === 0 && paraDesativar.length === 0) {
-        toast.info("Nenhuma alteracao de grupos para salvar");
-        return;
+        setLinhas([]);
+        setPermissoesGlobais([]);
       }
 
-      const [ativacoes, desativacoes] = await Promise.all([
-        Promise.all(
-          paraAtivar.map((id) =>
-            atualizarGrupoUsuarioDev(user.id, id, {
-              ativo: true,
-              permissao_grupo:
-                vinculosPorGrupo[id]?.permissaoGrupo ||
-                (id === grupoId ? permissaoGrupo : "USR"),
-            }),
-          ),
-        ),
-        Promise.all(
-          paraDesativar.map((id) =>
-            atualizarGrupoUsuarioDev(user.id, id, {
-              ativo: false,
-              permissao_grupo: vinculosPorGrupo[id]?.permissaoGrupo || "USR",
-            }),
-          ),
-        ),
-      ]);
-
-      const erros = [...ativacoes, ...desativacoes].filter((r) => !r.ok);
-
-      if (erros.length > 0) {
-        toast.error("Falha ao vincular grupos", {
-          description: erros[0]?.error || undefined,
-        });
-        return;
-      }
-
-      const recarregar = await listarGruposUsuarioDev(user.id);
-      if (!recarregar.ok || !recarregar.data) {
-        toast.warning("Grupos salvos, mas falha ao validar persistencia", {
-          description: recarregar.error || undefined,
-        });
-        setGruposPersistidos(gruposSelecionados);
-      } else {
-        const mapaAtualizado = recarregar.data.reduce<
-          Record<string, GrupoUsuarioDev>
-        >((acc, item) => {
-          acc[item.grupoId] = item;
-          return acc;
-        }, {});
-
-        const ativosAtualizados = recarregar.data
-          .filter((v) => v.ativo)
-          .map((v) => v.grupoId);
-
-        setVinculosPorGrupo(mapaAtualizado);
-        setGruposPersistidos(ativosAtualizados);
-        setGruposSelecionados(ativosAtualizados);
-
-        const setAtivosAtualizados = new Set(ativosAtualizados);
-        const naoAtivados = gruposSelecionados.filter(
-          (id) => !setAtivosAtualizados.has(id),
-        );
-        const naoDesativados = ativosAtualizados.filter(
-          (id) => !setSelecionados.has(id),
-        );
-
-        const nomeGrupo = (id: string) => {
-          const grupoLista = grupos.find((g) => g.id === id);
-          if (grupoLista) {
-            return grupoLista.sigla
-              ? `${grupoLista.sigla} (${id})`
-              : `${grupoLista.nome} (${id})`;
-          }
-
-          const vinculo = mapaAtualizado[id] || vinculosPorGrupo[id];
-          if (vinculo) {
-            return vinculo.sigla
-              ? `${vinculo.sigla} (${id})`
-              : `${vinculo.nome} (${id})`;
-          }
-
-          return id;
-        };
-
-        if (naoAtivados.length > 0 || naoDesativados.length > 0) {
-          const detalhes: string[] = [];
-          if (naoAtivados.length > 0) {
-            detalhes.push(
-              `Nao ativados: ${naoAtivados.map(nomeGrupo).join(", ")}`,
-            );
-          }
-          if (naoDesativados.length > 0) {
-            detalhes.push(
-              `Nao desativados: ${naoDesativados.map(nomeGrupo).join(", ")}`,
-            );
-          }
-
-          toast.warning("Persistencia parcial de grupos", {
-            description: detalhes.join(" | "),
-          });
-        } else {
-          toast.success("Grupos vinculados ao usuario");
-        }
-      }
-
-      if (!grupoId && gruposSelecionados[0]) {
-        setGrupoId(gruposSelecionados[0]);
-      }
-
-      if (grupoId && !gruposSelecionados.includes(grupoId)) {
-        setGrupoId(gruposSelecionados[0] || "");
-      }
+      setCarregando(false);
     });
   };
 
-  const salvarPermissoesPorGrupo = () => {
-    if (!grupoId) {
-      toast.error("Selecione um grupo");
-      return;
-    }
+  useEffect(() => {
+    if (!open) return;
+    setCarregando(true);
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user.id]);
 
+  const grupoIdsEmUso = new Set(linhas.map((l) => l.grupoId));
+  const gruposDisponiveis = todosGrupos.filter((g) => !grupoIdsEmUso.has(g.id));
+
+  const adicionarGrupo = () => {
+    if (!grupoParaAdicionar) return;
+    const grupo = todosGrupos.find((g) => g.id === grupoParaAdicionar);
+    if (!grupo) return;
+
+    setLinhas((prev) => [
+      ...prev,
+      {
+        grupoId: grupo.id,
+        nome: grupo.nome,
+        sigla: grupo.sigla,
+        papel: "USR",
+        permissoesExtras: [],
+        novo: true,
+        removida: false,
+      },
+    ]);
+    setGrupoParaAdicionar("");
+  };
+
+  const atualizarLinha = (grupoId: string, patch: Partial<Linha>) => {
+    setLinhas((prev) =>
+      prev.map((l) => (l.grupoId === grupoId ? { ...l, ...patch } : l)),
+    );
+  };
+
+  const removerLinha = (grupoId: string) => {
+    setLinhas((prev) =>
+      prev
+        .map((l) => (l.grupoId === grupoId ? { ...l, removida: true } : l))
+        .filter((l) => !(l.grupoId === grupoId && l.novo)),
+    );
+  };
+
+  const desfazerRemocao = (grupoId: string) => {
+    atualizarLinha(grupoId, { removida: false });
+  };
+
+  const salvarAlteracoes = () => {
     startTransition(async () => {
-      const vinculoResp = await atualizarGrupoUsuarioDev(user.id, grupoId, {
-        ativo: true,
-        permissao_grupo: permissaoGrupo,
-      });
+      const ativas = linhas.filter((l) => !l.removida);
+      const remocoes = linhas.filter((l) => l.removida && !l.novo);
 
-      if (!vinculoResp.ok) {
-        toast.error("Falha ao salvar papel no grupo", {
-          description: vinculoResp.error || undefined,
-        });
-        return;
-      }
-
-      const resp = await atualizarPermissoesGrupoUsuarioDev(
-        user.id,
-        grupoId,
-        payloadCapacidades,
-      );
-      if (!resp.ok) {
-        toast.error("Falha ao salvar permissoes por grupo", {
-          description: resp.error || undefined,
-        });
-        return;
-      }
-
-      setVinculosPorGrupo((prev) => ({
-        ...prev,
-        [grupoId]: {
-          ...(prev[grupoId] || {
-            grupoId,
-            nome: grupoId,
-            ativo: true,
+      const chamadas = [
+        ...ativas.map(async (linha) => {
+          const vinculoResp = await atualizarGrupoUsuarioDev(
+            user.id,
+            linha.grupoId,
+            {
+              ativo: true,
+              permissao_grupo: linha.papel,
+            },
+          );
+          if (!vinculoResp.ok) return vinculoResp;
+          return atualizarPermissoesGrupoUsuarioDev(user.id, linha.grupoId, {
+            codigos: linha.permissoesExtras,
+          });
+        }),
+        ...remocoes.map((linha) =>
+          atualizarGrupoUsuarioDev(user.id, linha.grupoId, {
+            ativo: false,
+            permissao_grupo: linha.papel,
           }),
-          ativo: true,
-          permissaoGrupo,
-          capacidades: {
-            visualizar_proprios: Boolean(
-              payloadCapacidades.visualizar_proprios,
-            ),
-            visualizar_grupo: Boolean(payloadCapacidades.visualizar_grupo),
-            modificar_proprios: Boolean(payloadCapacidades.modificar_proprios),
-            modificar_grupo: Boolean(payloadCapacidades.modificar_grupo),
-            excluir: Boolean(payloadCapacidades.excluir),
-            ativo: true,
-          },
-        },
-      }));
+        ),
+        atualizarPermissoesGlobaisUsuarioDev(user.id, {
+          codigos: permissoesGlobais,
+        }),
+      ];
 
-      toast.success("Papel e permissoes por grupo atualizados");
+      const respostas = await Promise.all(chamadas);
+      const erros = respostas.filter((r) => !r.ok);
+
+      if (erros.length > 0) {
+        toast.error("Algumas alterações não foram salvas", {
+          description: erros[0]?.error || undefined,
+        });
+      } else {
+        toast.success("Alterações salvas");
+      }
+
+      carregar();
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="icon" variant="outline" title="Governanca DEV">
+        <Button size="icon" variant="outline" title="Permissões do usuário">
           <Settings2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Governanca DEV</DialogTitle>
+          <DialogTitle>Permissões do usuário </DialogTitle>
           <DialogDescription>
-            Configure vinculos de grupo, papel no grupo e capacidades
-            combinaveis para <span className="font-medium">{user.nome}</span>.
+            Grupos, papel por grupo e permissões (do grupo + extras do usuário)
+            para <span className="font-medium">{user.nome}</span>.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2 rounded-md border p-3">
-            <Label>Grupo</Label>
-            <MultiSelect
-              key={`grupos-${user.id}-${gruposSelecionados.join("|")}-${grupos.length}`}
-              options={grupos.map((grupo) => ({
-                value: grupo.id,
-                label: grupo.sigla
-                  ? `${grupo.sigla} - ${grupo.nome}`
-                  : grupo.nome,
-              }))}
-              defaultValue={gruposSelecionados}
-              onValueChange={setGruposSelecionados}
-              placeholder="Selecione um ou mais grupos"
-              maxCount={4}
-            />
-
-            <Label>Grupo alvo para permissões por grupo</Label>
-            <Select
-              value={grupoId}
-              onValueChange={setGrupoId}
-              disabled={gruposSelecionados.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o grupo alvo" />
-              </SelectTrigger>
-              <SelectContent>
-                {grupos
-                  .filter((grupo) => gruposSelecionados.includes(grupo.id))
-                  .map((grupo) => (
-                    <SelectItem key={grupo.id} value={grupo.id}>
-                      {grupo.sigla
-                        ? `${grupo.sigla} - ${grupo.nome}`
-                        : grupo.nome}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {grupos.length === 0 && (
-              <p className="text-xs text-amber-700">
-                Nenhum grupo retornado pelo backend para o endpoint de grupos
-                DEV.
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button onClick={vincularGrupos} disabled={isPending}>
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : null}
-                Vincular grupos
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={salvarPermissoesPorGrupo}
-                disabled={isPending}
-              >
-                Salvar papel e capacidades
-              </Button>
-            </div>
+        {carregando ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" /> Carregando...
           </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <Label>Grupos vinculados</Label>
 
-          <div className="space-y-2 rounded-md border p-3">
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Papel no grupo</Label>
+              {linhas.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum grupo vinculado ainda.
+                </p>
+              )}
+
+              {linhas.map((linha) => {
+                const baselineAtual =
+                  todosGrupos.find((g) => g.id === linha.grupoId)
+                    ?.permissoesBase[linha.papel] || [];
+
+                return linha.removida ? (
+                  <div
+                    key={linha.grupoId}
+                    className="flex items-center justify-between rounded-md border border-dashed p-3 text-sm text-muted-foreground"
+                  >
+                    <span>
+                      {linha.sigla
+                        ? `${linha.sigla} - ${linha.nome}`
+                        : linha.nome}{" "}
+                      será removido
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => desfazerRemocao(linha.grupoId)}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" /> Desfazer
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    key={linha.grupoId}
+                    className="space-y-2 rounded-md border p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">
+                        {linha.sigla
+                          ? `${linha.sigla} - ${linha.nome}`
+                          : linha.nome}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removerLinha(linha.grupoId)}
+                      >
+                        <X className="h-4 w-4 mr-1" /> Remover
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Papel no grupo</Label>
+                        <Select
+                          value={linha.papel}
+                          onValueChange={(v: Papel) =>
+                            atualizarLinha(linha.grupoId, { papel: v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ADM">ADM</SelectItem>
+                            <SelectItem value="TEC">TEC</SelectItem>
+                            <SelectItem value="USR">USR</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {baselineAtual.length > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">
+                          Permissões do papel {linha.papel} neste grupo
+                        </Label>
+                        <div className="flex flex-wrap gap-1">
+                          {baselineAtual.map((codigo) => (
+                            <Badge key={codigo} variant="secondary">
+                              {descricaoPermissao(codigo)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        Permissões extras neste grupo
+                      </Label>
+                      <MultiSelect
+                        options={opcoesPermissoes}
+                        value={linha.permissoesExtras}
+                        onValueChange={(codigos) =>
+                          atualizarLinha(linha.grupoId, {
+                            permissoesExtras: codigos,
+                          })
+                        }
+                        placeholder="Selecione permissões extras, além do que o grupo já concede"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex gap-2">
                 <Select
-                  value={permissaoGrupo}
-                  onValueChange={(v: "ADM" | "TEC" | "USR") =>
-                    setPermissaoGrupo(v)
-                  }
+                  value={grupoParaAdicionar}
+                  onValueChange={setGrupoParaAdicionar}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecione um grupo para adicionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ADM">ADM</SelectItem>
-                    <SelectItem value="TEC">TEC</SelectItem>
-                    <SelectItem value="USR">USR</SelectItem>
+                    {gruposDisponiveis.map((grupo) => (
+                      <SelectItem key={grupo.id} value={grupo.id}>
+                        {grupo.sigla
+                          ? `${grupo.sigla} - ${grupo.nome}`
+                          : grupo.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="secondary"
+                  onClick={adicionarGrupo}
+                  disabled={!grupoParaAdicionar}
+                >
+                  Adicionar
+                </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <div className="flex items-center justify-between rounded border p-2">
-                <Label htmlFor="vg">Visualizar grupo</Label>
-                <Switch
-                  id="vg"
-                  checked={visualizarGrupo}
-                  onCheckedChange={setVisualizarGrupo}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded border p-2">
-                <Label htmlFor="vp">Visualizar proprios</Label>
-                <Switch
-                  id="vp"
-                  checked={visualizarProprios}
-                  onCheckedChange={setVisualizarProprios}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded border p-2">
-                <Label htmlFor="mg">Modificar grupo</Label>
-                <Switch
-                  id="mg"
-                  checked={modificarGrupo}
-                  onCheckedChange={setModificarGrupo}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded border p-2">
-                <Label htmlFor="mp">Modificar proprios</Label>
-                <Switch
-                  id="mp"
-                  checked={modificarProprios}
-                  onCheckedChange={setModificarProprios}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded border p-2 md:col-span-2">
-                <Label htmlFor="ex">Excluir</Label>
-                <Switch
-                  id="ex"
-                  checked={excluir}
-                  onCheckedChange={setExcluir}
-                />
-              </div>
+            <div className="space-y-2 rounded-md border p-3">
+              <Label>Permissões globais (independem do grupo ativo)</Label>
+              <MultiSelect
+                options={opcoesPermissoes}
+                value={permissoesGlobais}
+                onValueChange={setPermissoesGlobais}
+                placeholder="Selecione as permissões concedidas ao usuário, em qualquer grupo"
+              />
+            </div>
+
+            <Input disabled value={user.login} />
+
+            <div className="flex justify-end">
+              <Button onClick={salvarAlteracoes} disabled={isPending}>
+                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar alterações
+              </Button>
             </div>
           </div>
-
-          <Input disabled value={user.login} />
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

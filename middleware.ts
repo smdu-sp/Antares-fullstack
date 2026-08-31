@@ -1,21 +1,23 @@
 /** @format */
 
 import { auth } from "@/lib/auth/auth.middleware";
-import { canAdmin, getPermissaoCoordenadoria } from "@/lib/access-control";
 import { NextResponse } from "next/server";
 
 export async function middleware(request: any) {
   const session = await auth();
 
-  // Rotas que requerem DEV e ADM
-  const adminRoutes = ["/unidades", "/interessados", "/usuarios"];
-  // Rotas que requerem apenas DEV
-  const devOnlyRoutes = ["/logs", "/grupos-acesso"];
+  // Rotas restritas a DEV (usuários, unidades, interessados, permissões e logs
+  // são gestão de sistema — não fazem mais parte do escopo de um ADM de grupo comum)
+  const devOnlyRoutes = [
+    "/unidades",
+    "/interessados",
+    "/usuarios",
+    "/permissoes",
+    "/logs",
+  ];
 
   const pathname = request.nextUrl.pathname;
 
-  // Verificar se é uma rota protegida
-  const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route));
   const isDevOnlyRoute = devOnlyRoutes.some((route) =>
     pathname.startsWith(route),
   );
@@ -28,20 +30,9 @@ export async function middleware(request: any) {
     return NextResponse.next();
   }
 
-  const userPermission = session.usuario?.permissao;
-  const userCoordenadoriaPermission = getPermissaoCoordenadoria(session);
+  const isDev = session.usuario?.dev;
 
-  // Verificar rotas que requerem DEV e ADM
-  if (isAdminRoute && !canAdmin(session)) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  // Verificar rotas que requerem apenas DEV
-  if (
-    isDevOnlyRoute &&
-    userPermission !== "DEV" &&
-    userCoordenadoriaPermission !== "ADMINISTRADOR"
-  ) {
+  if (isDevOnlyRoute && !isDev) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

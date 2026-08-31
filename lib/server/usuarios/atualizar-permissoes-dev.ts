@@ -11,7 +11,7 @@ export async function atualizarPermissoesDev(id: string, dados: AtualizarPermiss
   const atualizado = await prisma.usuario.update({
     where: { id },
     data: {
-      ...(dados.permissao !== undefined ? { permissao: dados.permissao } : {}),
+      ...(dados.dev !== undefined ? { dev: dados.dev } : {}),
       ...(dados.status !== undefined ? { status: dados.status } : {}),
     },
     include: { unidade: { select: { id: true, nome: true, sigla: true } } },

@@ -27,8 +27,14 @@ async function extractErrorMessage(
   return fallback;
 }
 
+type Papel = "ADM" | "TEC" | "USR";
+
 export async function listarGrupos(): Promise<
-  IRespostaAcessosAdmin<{ total: number; data: IGrupo[] }>
+  IRespostaAcessosAdmin<{
+    total: number;
+    data: IGrupo[];
+    permissoesPorGrupo: Record<string, Partial<Record<Papel, string[]>>>;
+  }>
 > {
   const session = await auth();
   if (!session) redirect("/login");

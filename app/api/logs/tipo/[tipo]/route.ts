@@ -14,7 +14,7 @@ type Params = { params: Promise<{ tipo: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['DEV', 'ADM']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { tipo } = await params;
     const { searchParams } = new URL(request.url);

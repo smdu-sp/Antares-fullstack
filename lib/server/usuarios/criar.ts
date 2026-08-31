@@ -4,7 +4,7 @@ import { HttpError } from '@/lib/server/http-error';
 import type { CreateUsuarioInput } from '@/lib/server/validation/usuarios.schema';
 import { buscarPorLogin } from './buscar-por-login';
 import { buscarPorEmail } from './buscar-por-email';
-import { validaPermissaoCriador } from './valida-permissao-criador';
+import { validaDevCriador } from './valida-dev-criador';
 import { sincronizarGrupoLegado } from './sincronizar-grupo-legado';
 
 /** Porte de UsuariosService.criar (Antares-backend/src/usuarios/usuarios.service.ts). */
@@ -20,9 +20,7 @@ export async function criar(dados: CreateUsuarioInput, usuarioLogado: Usuario) {
   const unidade = await prisma.unidade.findUnique({ where: { id: dados.unidade_id } });
   if (!unidade) throw new HttpError(400, 'Unidade não encontrada.');
 
-  const permissao = dados.permissao
-    ? validaPermissaoCriador(dados.permissao, usuarioLogado.permissao)
-    : undefined;
+  const dev = dados.dev !== undefined ? validaDevCriador(dados.dev, usuarioLogado.dev) : undefined;
 
   const usuario = await prisma.usuario.create({
     data: {
@@ -33,7 +31,7 @@ export async function criar(dados: CreateUsuarioInput, usuarioLogado: Usuario) {
       status: dados.status,
       avatar: dados.avatar,
       unidade_id: dados.unidade_id,
-      ...(permissao && { permissao }),
+      ...(dev !== undefined && { dev }),
     },
   });
 

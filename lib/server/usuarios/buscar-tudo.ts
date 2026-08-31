@@ -1,4 +1,4 @@
-import { Permissao, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verificaLimite, verificaPagina } from '@/lib/server/pagination';
 
@@ -10,7 +10,7 @@ export async function buscarTudo(
   limiteInput?: number,
   busca?: string,
   status?: string,
-  permissao?: string,
+  dev?: string,
 ) {
   let [pagina, limite] = verificaPagina(paginaInput, limiteInput);
 
@@ -27,7 +27,7 @@ export async function buscarTudo(
       status !== '' && {
         status: status === 'ATIVO' ? true : status === 'INATIVO' ? false : undefined,
       }),
-    ...(permissao && permissao !== '' && { permissao: permissao as Permissao }),
+    ...(dev && dev !== '' && { dev: dev === 'true' }),
   };
 
   const total = await prisma.usuario.count({ where: searchParams });
@@ -40,7 +40,13 @@ export async function buscarTudo(
     orderBy: { nome: 'asc' },
     skip: (pagina - 1) * limite,
     take: limite,
-    include: { unidade: { select: UNIDADE_SELECT } },
+    include: {
+      unidade: { select: UNIDADE_SELECT },
+      grupos: {
+        where: { ativo: true, grupo: { ativo: true } },
+        select: { grupo: { select: { id: true, nome: true, codigo: true } } },
+      },
+    },
   });
 
   return { total, pagina, limite, data: usuarios };

@@ -1,7 +1,8 @@
 import { GrupoCodigo } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { AuthError } from './errors';
-import { avaliarCapacidade, resolverVinculoCapacidade } from './grupo-ativo';
+import { resolverGrupoAtivoParaPermissao } from './grupo-ativo';
+import { usuarioPodeNaEntidade, type EntidadePermissao, type AcaoPermissao } from './resolver-permissoes';
 
 export interface GrupoAtivoInfo {
   id: string;
@@ -14,30 +15,26 @@ export interface GrupoAtivoInfo {
  * Corresponde ao decorator @RequerCapacidade('entidade.acao') do NestJS —
  * chamar depois de requirePermissoes() na mesma rota, quando aplicável.
  */
-export async function requireCapacidade(
+export async function requirePermissao(
   usuarioId: string,
-  capacidade: string,
+  permissao: string,
   headerGrupoAtivoId?: string | null,
 ): Promise<{ grupoAtivo: GrupoAtivoInfo | null }> {
   const usuario = await prisma.usuario.findUnique({
     where: { id: usuarioId },
-    select: { permissao: true, status: true },
+    select: { dev: true, status: true },
   });
 
   if (!usuario || !usuario.status) throw new AuthError(403);
 
-  // Simplificação decidida pela usuária (2026-08-14): só DEV tem bypass de sistema.
-  // ADM deixou de ser especial — precisa de papel/capacidade real dentro do grupo,
-  // igual TEC/USR. O grupo GLOBAL deixou de existir como bypass (virou só uma
-  // permissão de sistema, DEV).
-  if (usuario.permissao === 'DEV') return { grupoAtivo: null };
+  if (usuario.dev) return { grupoAtivo: null };
 
-  const vinculoAtivo = await resolverVinculoCapacidade(usuarioId, headerGrupoAtivoId);
-  if (!vinculoAtivo?.permissao) throw new AuthError(403);
+  const vinculoAtivo = await resolverGrupoAtivoParaPermissao(usuarioId, headerGrupoAtivoId);
+  if (!vinculoAtivo) throw new AuthError(403);
 
-  if (!avaliarCapacidade(vinculoAtivo.grupo.codigo, vinculoAtivo.permissao, capacidade)) {
-    throw new AuthError(403);
-  }
+  const [entidade, acao] = permissao.split('.') as [EntidadePermissao, AcaoPermissao];
+  const permitido = await usuarioPodeNaEntidade(usuarioId, entidade, acao, vinculoAtivo.grupo.id);
+  if (!permitido) throw new AuthError(403);
 
   return {
     grupoAtivo: {

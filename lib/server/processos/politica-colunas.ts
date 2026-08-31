@@ -1,7 +1,7 @@
 import { GrupoCodigo } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { HttpError } from '@/lib/server/http-error';
-import { obterGrupoAtivoIdSimples } from '@/lib/server/shared/grupo-processo';
+import { obterGrupoAtivoIdSimples, usuarioEhMembroGabinete } from '@/lib/server/shared/grupo-processo';
 
 const CHAVE_ORDEM_COLUNAS_PROCESSOS = 'grid.processos.colunas.ordem';
 const COLUNAS_FIXAS_PROCESSOS = ['selecao', 'expansao'];
@@ -79,12 +79,25 @@ export async function obterPoliticaColunasProcessos(usuarioId: string) {
     select: { grupo: { select: { id: true, codigo: true, nome: true } } },
   });
 
-  if (!vinculoAtivo) {
+  // Visão do Gabinete: grupoAtivoId pode ser um grupo honorário (sem UsuarioGrupo
+  // real) — ver usuarioTemPermissao() em resolver-permissoes.ts. Sem esse fallback,
+  // a política de colunas falhava com 400 pro grupo escolhido no seletor, e a grid
+  // de processos ficava sem nenhuma coluna configurada (parecia "processos sumindo").
+  const grupoAtivo =
+    vinculoAtivo?.grupo ||
+    (( await usuarioEhMembroGabinete(usuarioId))
+      ? await prisma.grupo.findFirst({
+          where: { id: grupoAtivoId, ativo: true },
+          select: { id: true, codigo: true, nome: true },
+        })
+      : null);
+
+  if (!grupoAtivo) {
     throw new HttpError(400, 'Vinculo ativo do grupo selecionado nao foi encontrado para o usuario.');
   }
 
-  const ordemPadrao = obterColunasPadraoPorGrupo(vinculoAtivo.grupo.codigo);
-  const chaveGrupo = `${CHAVE_ORDEM_COLUNAS_PROCESSOS}.${vinculoAtivo.grupo.codigo.toLowerCase()}`;
+  const ordemPadrao = obterColunasPadraoPorGrupo(grupoAtivo.codigo);
+  const chaveGrupo = `${CHAVE_ORDEM_COLUNAS_PROCESSOS}.${grupoAtivo.codigo.toLowerCase()}`;
 
   const [preferenciaGrupo, preferenciaGlobal] = await Promise.all([
     prisma.preferenciasUsuario.findUnique({
@@ -105,7 +118,7 @@ export async function obterPoliticaColunasProcessos(usuarioId: string) {
   const ordemEfetiva = montarOrdemEfetivaColunas(ordemPadrao, ordemUsuario);
 
   return {
-    grupoAtivo: vinculoAtivo.grupo,
+    grupoAtivo,
     chavePreferenciaOrdem: chaveGrupo,
     colunasFixas: COLUNAS_FIXAS_PROCESSOS,
     colunasDisponiveis: ordemPadrao,

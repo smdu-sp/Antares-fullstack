@@ -3,7 +3,7 @@ import { jsonResponse } from '@/lib/http/json-response';
 import { handleRouteError } from '@/lib/http/handle-route-error';
 import { requireAuth } from '@/lib/server/auth/session';
 import { requirePermissoes } from '@/lib/server/auth/permissoes';
-import { requireCapacidade } from '@/lib/server/auth/capacidade';
+import { requirePermissao } from '@/lib/server/auth/permissao';
 import { buscarPorNumeroSei } from '@/lib/server/processos/buscar-por-numero-sei';
 
 export const runtime = 'nodejs';
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
-    await requireCapacidade(usuario.id, 'processo.visualizar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'processo.visualizar', request.headers.get('x-grupo-ativo-id'));
 
     const { numero_sei } = await params;
     const resultado = await buscarPorNumeroSei(numero_sei, usuario.id);

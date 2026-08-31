@@ -48,6 +48,13 @@ export async function vincularUsuarioGrupo(
     include: { grupo: true },
   });
 
+  // Derruba qualquer sessão já aberta do usuário afetado — ver checagem de
+  // versao_sessao em auth.node.config.ts (jwt callback).
+  await prisma.usuario.update({
+    where: { id: usuarioId },
+    data: { versao_sessao: { increment: 1 } },
+  });
+
   await criarLog(
     TipoAcao.USUARIO_PERMISSAO_ATUALIZADA,
     `Vinculo usuario-grupo atualizado: usuario=${usuarioId}, grupo=${vinculo.grupo.codigo}`,

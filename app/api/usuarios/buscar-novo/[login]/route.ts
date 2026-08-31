@@ -13,7 +13,7 @@ type Params = { params: Promise<{ login: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { login } = await params;
     const resultado = await buscarNovo(login);

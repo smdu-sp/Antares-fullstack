@@ -21,7 +21,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
 // Use simple { from?: Date | null; to?: Date | null } instead of react-day-picker types
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { DatePickerWithRange } from "./ui/date-range";
@@ -94,14 +94,18 @@ export function Filtros({
       : {},
   );
 
-  // Timer para debounce
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(
-    null,
-  );
+  // Timer para debounce — em ref, não state: o valor em si nunca precisa
+  // disparar um re-render, só precisa sobreviver entre renders pra poder ser
+  // limpo. Guardar em useState fazia o componente re-renderizar a cada
+  // tecla digitada só pra armazenar o id do timer.
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Inicialização - sincroniza com URL apenas uma vez
+  // Inicialização - sincroniza com URL apenas uma vez. Deliberadamente só no
+  // mount: isso lê a URL pra montar o estado inicial; reagir a
+  // camposFiltraveis/searchParams depois disso re-inicializaria os filtros a
+  // cada navegação disparada pelo próprio atualizaFiltros(), quebrando o fluxo.
   useEffect(() => {
     const initialFiltros: { [key: string]: string } = {};
 
@@ -114,36 +118,10 @@ export function Filtros({
 
     setFiltros(initialFiltros);
     setIsInitialized(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-search com debounce quando autoSearch está ativo
-  useEffect(() => {
-    // Não executa antes da inicialização
-    if (!isInitialized || !autoSearch) return;
-
-    // Marca como pesquisando enquanto aguarda
-    setIsSearching(true);
-
-    // Limpa o timer anterior
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-
-    // Cria novo timer
-    const timer = setTimeout(() => {
-      atualizaFiltros();
-      setIsSearching(false);
-    }, debounceMs);
-
-    setDebounceTimer(timer);
-
-    // Cleanup
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [filtros, isInitialized, autoSearch]);
-
-  function atualizaFiltros() {
+  const atualizaFiltros = useCallback(() => {
     let urlParams = "pagina=1&"; // Sempre reseta para página 1 ao filtrar
 
     if (clearOtherFiltersOnSearch) {
@@ -162,7 +140,34 @@ export function Filtros({
     }
 
     router.push(`${pathname}?${urlParams}`);
-  }
+  }, [filtros, clearOtherFiltersOnSearch, router, pathname]);
+
+  // Auto-search com debounce quando autoSearch está ativo
+  useEffect(() => {
+    // Não executa antes da inicialização
+    if (!isInitialized || !autoSearch) return;
+
+    // Marca como pesquisando enquanto aguarda
+    setIsSearching(true);
+
+    // Limpa o timer anterior
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Cria novo timer
+    const timer = setTimeout(() => {
+      atualizaFiltros();
+      setIsSearching(false);
+    }, debounceMs);
+
+    debounceTimerRef.current = timer;
+
+    // Cleanup
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [filtros, isInitialized, autoSearch, debounceMs, atualizaFiltros]);
 
   function limpaFiltros() {
     setFiltros(
@@ -236,7 +241,7 @@ export function Filtros({
           }
           value={filtros[campo.tag]}
         >
-          <SelectTrigger className="w-full md:w-60 text-nowrap bg-background">
+          <SelectTrigger className="w-full md:w-60 h-10 sm:h-12 text-nowrap bg-background">
             <SelectValue placeholder={campo.placeholder} />
           </SelectTrigger>
           <SelectContent>
@@ -339,7 +344,12 @@ export function Filtros({
         paramUpdate && paramUpdate !== "" ? paramUpdate.split(",") : ["", ""];
       const [from, to] = verificaData(datas[0], datas[1]);
       setDate(datas[0] !== "" && datas[1] !== "" ? { from, to } : undefined);
-    }, [searchParams]);
+      // searchParams precisa continuar na lista mesmo o eslint achando que não
+      // (RenderDataRange não é reconhecido como componente por não ser
+      // renderizado via JSX) — é o valor que muda quando a URL muda, e é
+      // literalmente lido no corpo do efeito acima.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, campo.tag]);
 
     return (
       <div className={"flex flex-col grid gap-2"} key={campo.tag}>
@@ -360,7 +370,7 @@ export function Filtros({
       {renderFiltros()}
       {showSearchButton && (
         <Button
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto h-10 sm:h-12"
           size="lg"
           disabled={isPending}
           onClick={() => startTransition(() => atualizaFiltros())}
@@ -377,7 +387,7 @@ export function Filtros({
           variant={"outline"}
           size="lg"
           disabled={isPending}
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto h-10 sm:h-12"
           onClick={() => startTransition(() => limpaFiltros())}
           title="Limpar filtros"
         >

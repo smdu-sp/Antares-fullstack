@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { Permissao } from '@prisma/client';
 
 /** Porte de CreateUsuarioDto (Antares-backend/src/usuarios/dto/create-usuario.dto.ts). */
 export const createUsuarioSchema = z.object({
@@ -14,7 +13,7 @@ export const createUsuarioSchema = z.object({
     .string({ invalid_type_error: 'Login inválido!' })
     .min(7, 'Login tem de ter ao menos 7 caracteres.'),
   email: z.string({ invalid_type_error: 'Login inválido!' }).email('Login tem de ter ao menos 7 caracteres.'),
-  permissao: z.nativeEnum(Permissao, { errorMap: () => ({ message: 'Escolha uma permissão válida.' }) }).optional(),
+  dev: z.boolean({ invalid_type_error: 'Valor inválido.' }).optional(),
   status: z.boolean({ invalid_type_error: 'Status inválido!' }).optional(),
   avatar: z.string({ invalid_type_error: 'Tem de ser texto.' }).optional(),
   unidade_id: z.string({ invalid_type_error: 'ID da unidade deve ser texto.' }),
@@ -25,7 +24,7 @@ export const updateUsuarioSchema = createUsuarioSchema.partial();
 
 /** Porte de AtualizarPermissoesDevDto (Antares-backend/src/usuarios/dto/atualizar-permissoes-dev.dto.ts). */
 export const atualizarPermissoesDevSchema = z.object({
-  permissao: z.nativeEnum(Permissao).optional(),
+  dev: z.boolean().optional(),
   status: z.boolean().optional(),
 });
 

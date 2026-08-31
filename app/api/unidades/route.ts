@@ -13,7 +13,12 @@ export const runtime = 'nodejs';
 export async function POST(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM']);
+    // Criar unidade não é exclusivo da página admin — a grid de processos cria
+    // uma unidade inline ao editar a célula, pra qualquer papel
+    // (components/unidade-autocomplete-editor.tsx). Só editar/remover uma
+    // unidade já cadastrada (rotas [id], listagem paginada da página admin)
+    // fica exclusivo de DEV.
+    await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
 
     const body = await request.json();
     const dados = createUnidadeSchema.parse(body);
@@ -29,7 +34,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { searchParams } = new URL(request.url);
     const pagina = Number(searchParams.get('pagina')) || undefined;

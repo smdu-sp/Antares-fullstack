@@ -15,8 +15,5 @@ export const PROCESSO_INCLUDE_PADRAO = {
       usuarioProrrogacao: { select: USUARIO_SELECT },
     },
   },
-  grupos: {
-    where: { ativo: true },
-    select: { grupo: { select: { id: true, codigo: true, nome: true } } },
-  },
+  grupo: { select: { id: true, codigo: true, nome: true } },
 } satisfies Prisma.processoInclude;

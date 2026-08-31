@@ -91,8 +91,12 @@ export default function AndamentosDetalhes({
   processo: IProcesso;
 }) {
   const { data: session } = useSession();
-  const hasEditPermission = canEdit(session?.usuario);
-  const hasAdminPermission = canAdmin(session?.usuario);
+  // canEdit/canAdmin precisam da sessão inteira (usam session.grupoAtivo.membroAtivo.
+  // permissao pra refletir o papel real do grupo ativo) — passar só session.usuario
+  // faz cair sempre no fallback de DEV, escondendo edição/exclusão pra qualquer
+  // ADM/TEC real de grupo que não seja também DEV.
+  const hasEditPermission = canEdit(session);
+  const hasAdminPermission = canAdmin(session);
   const [andamentos, setAndamentos] = useState<IAndamento[]>(
     processo.andamentos || [],
   );
@@ -120,7 +124,7 @@ export default function AndamentosDetalhes({
       }
       setLoading(false);
     }
-  }, [session?.access_token, processo.id]);
+  }, [session?.access_token, session?.grupoAtivo?.id, processo.id]);
 
   useEffect(() => {
     if (session && refreshKey > 0) {
@@ -759,8 +763,12 @@ function AndamentoRow({
   onToggleSelection?: () => void;
 }) {
   const { data: session } = useSession();
-  const hasEditPermission = canEdit(session?.usuario);
-  const hasAdminPermission = canAdmin(session?.usuario);
+  // canEdit/canAdmin precisam da sessão inteira (usam session.grupoAtivo.membroAtivo.
+  // permissao pra refletir o papel real do grupo ativo) — passar só session.usuario
+  // faz cair sempre no fallback de DEV, escondendo edição/exclusão pra qualquer
+  // ADM/TEC real de grupo que não seja também DEV.
+  const hasEditPermission = canEdit(session);
+  const hasAdminPermission = canAdmin(session);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Função para obter o estilo do badge baseado no status

@@ -65,6 +65,44 @@ import { canAdmin } from "@/lib/access-control";
 
 const COLUNAS_FIXAS_UI = ["checkbox", "expand", "acoes"];
 
+// Cores de destaque (prazo vencido/vence hoje/vence em breve, concluído) usadas
+// nas células/linhas da grid. As versões de tema escuro usam fundo translúcido
+// (em vez do mesmo hex claro do tema claro) porque um fundo pastel sólido fica
+// "estourado"/sem contraste sobre o fundo escuro do app.
+const CORES_DESTAQUE = {
+  verde: {
+    light: { backgroundColor: "#dcfce7", color: "#15803d" },
+    dark: { backgroundColor: "rgba(34, 197, 94, 0.18)", color: "#4ade80" },
+  },
+  vermelho: {
+    light: { backgroundColor: "#fee", color: "#c00" },
+    dark: { backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#f87171" },
+  },
+  laranja: {
+    light: { backgroundColor: "#ffebcc", color: "#cc6600" },
+    dark: { backgroundColor: "rgba(249, 115, 22, 0.2)", color: "#fb923c" },
+  },
+  amarelo: {
+    light: { backgroundColor: "#ffc", color: "#880" },
+    dark: { backgroundColor: "rgba(234, 179, 8, 0.2)", color: "#facc15" },
+  },
+  amareloClaro: {
+    light: { backgroundColor: "#ffe", color: "#990" },
+    dark: { backgroundColor: "rgba(234, 179, 8, 0.14)", color: "#eab308" },
+  },
+  transparente: {
+    light: { backgroundColor: "transparent", color: "inherit" },
+    dark: { backgroundColor: "transparent", color: "inherit" },
+  },
+} as const;
+
+function corDestaque(
+  cor: keyof typeof CORES_DESTAQUE,
+  isDark: boolean,
+): { backgroundColor: string; color: string } {
+  return CORES_DESTAQUE[cor][isDark ? "dark" : "light"];
+}
+
 // Registrar todos os módulos da comunidade AG-Grid
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -107,6 +145,17 @@ function AndamentosDetail({
 }) {
   const { data: session } = useSession();
   const { theme, systemTheme } = useTheme();
+  // columnDefs abaixo é criado só uma vez (useMemo com deps []), então o
+  // cellStyle preso naquele closure nunca veria um `theme` atualizado — por
+  // isso lê de uma ref mantida em sincronia, não da variável direta.
+  const isDarkModeRef = useRef(false);
+  useEffect(() => {
+    isDarkModeRef.current =
+      theme === "dark" || (theme === "system" && systemTheme === "dark");
+    // Força o cellStyle a reavaliar com a ref já atualizada — sem isso a
+    // troca de tema em runtime não recolore as células já desenhadas.
+    gridRef.current?.api?.refreshCells({ force: true });
+  }, [theme, systemTheme]);
   const [andamentos, setAndamentos] = useState<IAndamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -161,7 +210,7 @@ function AndamentosDetail({
     }
 
     loadAndamentos();
-  }, [processo.id, session?.access_token, loaded, unidades]);
+  }, [processo.id, session?.access_token, session?.grupoAtivo?.id, loaded, unidades]);
 
   const adicionarAndamento = () => {
     const novoAndamento: any = {
@@ -611,13 +660,13 @@ function AndamentosDetail({
         },
         cellStyle: (params: any) => {
           const andamento = params.data as IAndamento;
+          const isDark = isDarkModeRef.current;
           // Se concluído, colorir de verde
           if (andamento.status === StatusAndamento.CONCLUIDO) {
-            return { backgroundColor: "#dcfce7", color: "#15803d" };
+            return corDestaque("verde", isDark);
           }
 
-          if (!params.value)
-            return { backgroundColor: "transparent", color: "inherit" };
+          if (!params.value) return corDestaque("transparente", isDark);
 
           const prazo = params.value as Date;
           const hoje = new Date();
@@ -629,15 +678,15 @@ function AndamentosDetail({
 
           if (diffDays < 0) {
             // Vencido - Vermelho
-            return { backgroundColor: "#fee", color: "#c00" };
+            return corDestaque("vermelho", isDark);
           } else if (diffDays === 0) {
             // Vence hoje - Laranja
-            return { backgroundColor: "#ffebcc", color: "#cc6600" };
+            return corDestaque("laranja", isDark);
           } else if (diffDays === 1) {
             // Vence amanhã - Amarelo
-            return { backgroundColor: "#ffc", color: "#880" };
+            return corDestaque("amarelo", isDark);
           }
-          return { backgroundColor: "transparent", color: "inherit" };
+          return corDestaque("transparente", isDark);
         },
         width: 130,
       },
@@ -728,7 +777,7 @@ function AndamentosDetail({
         },
       },
     ],
-    [unidades, andamentos],
+    [andamentos],
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -1003,6 +1052,16 @@ export default function ProcessosSpreadsheet({
   const { data: session } = useSession();
   const router = useRouter();
   const { theme, systemTheme } = useTheme();
+  // Ver mesma nota em AndamentosDetail: columnDefs/getRowStyle são criados uma
+  // vez só, então lêem o tema de uma ref sempre atualizada, não da variável.
+  const isDarkModeRef = useRef(false);
+  useEffect(() => {
+    isDarkModeRef.current =
+      theme === "dark" || (theme === "system" && systemTheme === "dark");
+    // Força cellStyle/getRowStyle a reavaliar com a ref já atualizada — sem
+    // isso a troca de tema em runtime não recolore linhas/células já desenhadas.
+    gridRef.current?.api?.redrawRows();
+  }, [theme, systemTheme]);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const expandedRowsRef = useRef<Set<string>>(new Set());
   const [processosLocal, setProcessosLocal] = useState<IProcesso[]>(processos);
@@ -1093,6 +1152,12 @@ export default function ProcessosSpreadsheet({
     }
 
     carregarResponsaveis();
+    // session?.usuario fica de fora de propósito: o objeto session pode vir
+    // com referência nova a cada render mesmo com os mesmos dados (comum com
+    // useSession()), e canAdmin() só olha session.usuario.dev — colocar o
+    // objeto inteiro na lista faria esse fetch refazer sem necessidade a cada
+    // render. session?.grupoAtivo?.id já cobre a mudança que importa aqui.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.access_token, session?.grupoAtivo?.id, exibirAtribuicaoUsuario]);
 
   // Lista de interessados carregada no cliente (uma vez), usada pelo
@@ -1703,13 +1768,13 @@ export default function ProcessosSpreadsheet({
           },
           cellStyle: (params: any) => {
             const processo = params.data as IProcesso;
+            const isDark = isDarkModeRef.current;
             // Se concluído, não colorir
             if (isProcessoConcluido(processo)) {
-              return { backgroundColor: "transparent", color: "inherit" };
+              return corDestaque("transparente", isDark);
             }
 
-            if (!params.value)
-              return { backgroundColor: "transparent", color: "inherit" };
+            if (!params.value) return corDestaque("transparente", isDark);
             const prazo = params.value as Date;
             const hoje = new Date();
             hoje.setHours(0, 0, 0, 0);
@@ -1718,13 +1783,13 @@ export default function ProcessosSpreadsheet({
             );
 
             if (diffDays < 0) {
-              return { backgroundColor: "#fee", color: "#c00" };
+              return corDestaque("vermelho", isDark);
             } else if (diffDays === 0) {
-              return { backgroundColor: "#ffc", color: "#880" };
+              return corDestaque("amarelo", isDark);
             } else if (diffDays <= 3) {
-              return { backgroundColor: "#ffe", color: "#990" };
+              return corDestaque("amareloClaro", isDark);
             }
-            return { backgroundColor: "transparent", color: "inherit" };
+            return corDestaque("transparente", isDark);
           },
           width: 120,
         },
@@ -1804,8 +1869,17 @@ export default function ProcessosSpreadsheet({
           },
         },
       ] as ColDef[],
-    [], // SEM dependências - columnDefs só deve ser criado UMA vez
-    // Os componentes internos (headerComponent, cellRenderer) já capturam valores atuais quando executam
+    // SEM dependências, de propósito — recriar columnDefs a cada render em que
+    // compareDateValues/exibirAtribuicaoUsuario/getNomeResponsavelById/
+    // isProcessoConcluido/toggleSelect/toggleSelectAll/unidades mudassem de
+    // referência faria o AG-Grid resetar colunas inteiras (perde largura/ordem
+    // customizada, redesenha tudo) — o próprio motivo de existir desse comentário
+    // original. `unidades` só é populado uma vez por carregamento de página, e as
+    // funções de callback leem estado/props atuais via fechos que só executam
+    // quando o AG-Grid de fato chama o cellRenderer/valueGetter (não no momento
+    // da criação do array), então não ficam presas em valores velhos na prática.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const colunasRenderizadas = useMemo(() => {
@@ -2296,7 +2370,14 @@ export default function ProcessosSpreadsheet({
         savingRef.current.delete(processoAtualizado.id);
       }
     },
-    [session?.access_token, router, processosLocal, exibirAtribuicaoUsuario],
+    [
+      session?.access_token,
+      session?.grupoAtivo?.id,
+      router,
+      processosLocal,
+      exibirAtribuicaoUsuario,
+      unidades,
+    ],
   );
 
   const saveColumnState = useCallback(async () => {
@@ -2332,14 +2413,11 @@ export default function ProcessosSpreadsheet({
         }
       }
     }, 1000); // Debounce de 1 segundo
-  }, [session?.usuario, session?.id, chavePreferencia]);
+  }, [session?.usuario, chavePreferencia]);
 
-  const onGridReady = useCallback(
-    async (params: GridReadyEvent) => {
-      // A restauração agora é feita pelo useEffect que monitora a sessão
-    },
-    [session?.usuario, session?.id],
-  );
+  const onGridReady = useCallback(async (_params: GridReadyEvent) => {
+    // A restauração agora é feita pelo useEffect que monitora a sessão
+  }, []);
 
   const isProcessoConcluido = useCallback((processo: IProcesso) => {
     // Um processo é concluído se tem data_resposta_final ou resposta_final
@@ -2353,10 +2431,7 @@ export default function ProcessosSpreadsheet({
       }
       const processo = params.data as IProcesso;
       if (isProcessoConcluido(processo)) {
-        return {
-          backgroundColor: "#dcfce7",
-          color: "#15803d",
-        };
+        return corDestaque("verde", isDarkModeRef.current);
       }
       return undefined;
     },
@@ -2399,7 +2474,7 @@ export default function ProcessosSpreadsheet({
         />
       </div>
     );
-  }, []);
+  }, [unidades]);
 
   const getRowHeight = useCallback((params: any) => {
     const data = params.node?.data || params.data;

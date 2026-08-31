@@ -6,7 +6,7 @@ import Pagination from "@/components/pagination";
 import { auth } from "@/lib/auth/auth";
 import { AccessState } from "../_components/access-state";
 import * as interessado from "@/services/interessados";
-import { IInteressado } from "@/types/interessado";
+import { IInteressado, IPaginadoInteressado } from "@/types/interessado";
 import { Suspense } from "react";
 import { columns } from "./_components/columns";
 import ModalUpdateAndCreate from "./_components/modal-update-create";
@@ -36,37 +36,43 @@ async function Interessados({
   const session = await auth();
   if (!session?.grupoAtivo?.id) {
     return (
-      <div className="w-full px-0 md:px-8 relative pb-20 md:pb-14 h-full md:container mx-auto">
-        <h1 className="text-xl md:text-4xl font-bold">Interessados</h1>
-        <div className="my-5">
-          <AccessState
-            title="Selecione um grupo ativo para continuar"
-            description="Abra o menu do usuário e escolha um grupo ativo antes de acessar a lista de interessados."
-          />
-        </div>
+      <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
+        <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Interessados</h1>
+        <AccessState
+          title="Selecione um grupo ativo para continuar"
+          description="Abra o menu do usuário e escolha um grupo ativo antes de acessar a lista de interessados."
+        />
       </div>
     );
   }
 
   let erro403 = false;
   if (session && session.access_token) {
-    const response = await interessado.query.listar(
+    const response = await interessado.query.buscarTudo(
       session.access_token,
+      +pagina,
+      +limite,
+      busca as string,
       session.grupoAtivo.id,
     );
     const { data } = response;
     ok = response.ok;
     erro403 = response.status === 403;
-    if (ok && data) {
-      dados = data as IInteressado[];
-      total = dados.length;
+    if (ok) {
+      if (data) {
+        const paginado = data as IPaginadoInteressado;
+        pagina = paginado.pagina || 1;
+        limite = paginado.limite || 10;
+        total = paginado.total || 0;
+        dados = paginado.data || [];
+      }
     }
   }
 
   return (
-    <div className="w-full px-0 md:px-8 relative pb-20 md:pb-14 h-full md:container mx-auto">
-      <h1 className="text-xl md:text-4xl font-bold">Interessados</h1>
-      <div className="flex flex-col max-w-sm mx-auto md:max-w-full gap-3 my-5 w-full">
+    <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
+      <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Interessados</h1>
+      <div className="flex flex-col max-w-sm mx-auto md:max-w-full gap-3 w-full">
         {erro403 && (
           <AccessState
             title="Acesso negado para o grupo ativo"
@@ -89,7 +95,7 @@ async function Interessados({
           <Pagination total={+total} pagina={+pagina} limite={+limite} />
         )}
       </div>
-      <div className="absolute bottom-10 md:bottom-5 right-2 md:right-8 hover:scale-110">
+      <div className="fixed z-40 bottom-10 md:bottom-5 right-2 md:right-8 hover:scale-110">
         <ModalUpdateAndCreate isUpdating={false} />
       </div>
     </div>

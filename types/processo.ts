@@ -12,7 +12,7 @@ export interface IUsuario {
   nomeSocial?: string | null;
   login: string;
   email: string;
-  permissao: string;
+  dev: boolean;
   status: boolean;
   avatar?: string | null;
   ultimoLogin: Date;

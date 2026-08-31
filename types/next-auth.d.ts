@@ -11,7 +11,7 @@ declare module "next-auth" {
       nomeSocial?: string;
       login: string;
       email: string;
-      permissao: string;
+      dev: boolean;
       status: number;
       avatar?: string;
       iat: number;

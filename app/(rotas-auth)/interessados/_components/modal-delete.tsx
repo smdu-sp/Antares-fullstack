@@ -21,8 +21,9 @@ export default function ModalDelete({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
   const { data: session } = useSession();
 
-  // Verificar se o usuário tem permissão para deletar
-  const canDelete = canAdmin(session?.usuario);
+  // canAdmin precisa da sessão inteira, não só session.usuario (ver mesma
+  // correção em modal-delete-processo.tsx).
+  const canDelete = canAdmin(session);
 
   // Se não tiver permissão, retornar null (não renderizar o botão)
   if (!canDelete) {

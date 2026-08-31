@@ -3,7 +3,6 @@
 export type GrupoCodigo = "EXPEDIENTE" | "SERVIN" | "GABINETE" | "GLOBAL" | "OUTORGA";
 export type GrupoTipoEnum = "COORDENADORIA" | "DIVISAO";
 export type PermissaoGrupoEnum = "ADM" | "TEC" | "USR";
-export type NivelVisaoGrupoProcesso = "TOTAL" | "PARCIAL";
 
 export interface IGrupo {
   id: string;
@@ -27,21 +26,12 @@ export interface IUpdateGrupo {
   nome?: string;
 }
 
-export interface IProcessoGrupo {
-  id: string;
-  processo_id: string;
-  grupo_id: string;
-  nivelVisao: NivelVisaoGrupoProcesso;
-  ativo: boolean;
-  grupo?: IGrupo;
-}
-
 export interface IMatrizPermissaoLinha {
   usuario: {
     id: string;
     nome: string;
     login: string;
-    permissao: string;
+    dev: boolean;
     status: boolean;
   };
   grupo: {
@@ -51,14 +41,7 @@ export interface IMatrizPermissaoLinha {
     nome: string;
     ativo: boolean;
   };
-  permissao: {
-    visualizar_proprios: boolean;
-    visualizar_grupo: boolean;
-    modificar_proprios: boolean;
-    modificar_grupo: boolean;
-    excluir: boolean;
-    ativo: boolean;
-  } | null;
+  permissoes: string[];
   efetivo: {
     processo_visualizar: boolean;
     processo_modificar: boolean;

@@ -12,9 +12,3 @@ export async function validarGrupo(grupoId: string): Promise<void> {
   const grupo = await prisma.grupo.findUnique({ where: { id: grupoId }, select: { id: true } });
   if (!grupo) throw new HttpError(404, 'Grupo nao encontrado.');
 }
-
-/** Porte de AcessosAdminService.validarProcesso. */
-export async function validarProcesso(processoId: string): Promise<void> {
-  const processo = await prisma.processo.findUnique({ where: { id: processoId }, select: { id: true } });
-  if (!processo) throw new HttpError(404, 'Processo nao encontrado.');
-}

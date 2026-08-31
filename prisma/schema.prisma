@@ -27,14 +27,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enum: Permissões de acesso dos usuários no sistema - Define os níveis de permissão para controle de acesso às funcionalidades
-enum Permissao {
-  DEV // Desenvolvedor: Acesso total ao sistema, incluindo configurações e desenvolvimento
-  ADM // Administrador: Acesso administrativo completo, pode gerenciar usuários e processos
-  TEC // Técnico: Pode criar e gerenciar processos e andamentos
-  USR // Usuário: Acesso básico, apenas visualização de processos e andamentos
-}
-
 // Enum: Permissões de grupo (papel do usuário dentro de cada grupo)
 enum PermissaoGrupo {
   ADM
@@ -55,12 +47,6 @@ enum GrupoCodigo {
 enum GrupoTipo {
   COORDENADORIA
   DIVISAO
-}
-
-// Enum: Nível de visão do grupo sobre os dados do processo
-enum NivelVisaoGrupoProcesso {
-  TOTAL
-  PARCIAL
 }
 
 // Enum: Status do andamento do processo - Indica em qual situação se encontra o andamento do processo
@@ -109,9 +95,10 @@ model Usuario {
   nomeSocial String? // Nome social do usuário (opcional) - Nome pelo qual o usuário prefere ser chamado
   login      String    @unique // Login do usuário para acesso ao sistema - Obrigatório - Único - Exemplo: "joao.silva"
   email      String    @unique // E-mail do usuário - Obrigatório - Único - Deve ser um e-mail válido - Exemplo: "joao.silva@prefeitura.gov.br"
-  permissao  Permissao @default(USR) // Permissão de acesso do usuário no sistema - Enum (Permissao) - Valor padrão: USR - Valores: DEV, ADM, TEC, USR
+  dev        Boolean   @default(false) // Indica se o usuário é desenvolvedor (bypass total de autorização). Substitui o antigo enum Permissao (DEV/ADM/TEC/USR) — só DEV jamais teve efeito de autorização próprio; ADM/TEC/USR nesse campo eram inertes (o papel real de negócio vem de UsuarioGrupo.permissao_grupo)
 
   status     Boolean   @default(true) // Status ativo/inativo do usuário - Boolean - Valor padrão: true (ativo) - false = usuário desativado, não pode acessar o sistema
+  versao_sessao Int    @default(1) // Carimbo de versão da sessão - incrementado sempre que os vínculos de grupo do usuário mudam (ver vincularUsuarioGrupo), forçando o fim das sessões já abertas (comparado contra o valor gravado no token no momento do login em auth.node.config.ts)
   avatar     String?   // URL ou caminho da imagem de avatar do usuário - String (TEXT no banco) - Opcional - Armazena URL ou base64 da foto
   unidade_id String // ID da unidade à qual o usuário pertence (chave estrangeira) - String (UUID) - Obrigatório - Referência à unidade do usuário
   unidade    Unidade   @relation(fields: [unidade_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade à qual o usuário pertence
@@ -126,6 +113,7 @@ model Usuario {
   preferencias          PreferenciasUsuario[] // Lista de preferências do usuário - Array de PreferenciasUsuario - Configurações personalizadas do usuário
   processosAtribuidos   processo[] @relation("ProcessoAtribuidoPara") // Processos atribuídos diretamente ao usuário (escopo SERVIN)
   grupos                UsuarioGrupo[] // Vínculos de grupos do usuário para autorização granular
+  permissoes            UsuarioPermissoes[] // Permissões concedidas diretamente ao usuário (globais ou escopadas a um grupo)
 
   @@map("usuarios")
 }
@@ -133,7 +121,7 @@ model Usuario {
 // Model: processo | Tabela: processos | Descrição: Armazena informações dos processos administrativos que são controlados pelo sistema
 model processo {
   id                      String      @id @default(uuid()) // ID único do processo (UUID gerado automaticamente) - Chave primária
-  numero_sei              String      @unique // Número SEI (Sistema Eletrônico de Informações) do processo - String - Obrigatório - Único - Número único que identifica o processo no sistema SEI - Exemplo: "1234567"
+  numero_sei              String      // Número SEI (Sistema Eletrônico de Informações) do processo - String - Obrigatório - Único POR GRUPO (ver @@unique abaixo), não mais no sistema inteiro: cada grupo pode ter sua própria cópia independente do mesmo número SEI (ver vínculo automático em criar.ts) - Exemplo: "1234567"
   assunto                 String      @db.Text // Assunto do processo - TEXT - Obrigatório - Descrição detalhada do que trata o processo - Suporta textos longos até 65.535 caracteres - Exemplo: "Solicitação de licença para obra com descrição detalhada dos requisitos técnicos, localização, impacto ambiental e documentação necessária"
   origem                  String      @default("EXPEDIENTE") // Unidade de origem do processo - String - Obrigatório - Unidade que originou/solicitou o processo - Exemplo: "EXPEDIENTE", "COORDENADORIA_JURIDICA" - Valor padrão: EXPEDIENTE
   interessado_id          String? // ID do interessado (chave estrangeira) - String (UUID) - Opcional - Referência ao interessado do processo
@@ -154,10 +142,11 @@ model processo {
   ativo                   Boolean     @default(true) // Indica se o processo está ativo (true) ou foi excluído logicamente (false) - Boolean - Valor padrão: true
   unidade_id              String // ID da unidade que cadastrou o processo (chave estrangeira) - String (UUID) - Obrigatório - Referência à unidade responsável pelo processo
   unidade                 Unidade     @relation(fields: [unidade_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade que cadastrou o processo
+  grupo_id                String // Grupo dono desta cópia do processo (chave estrangeira) - String (UUID) - Obrigatório - cada grupo tem sua própria cópia independente (mesmo numero_sei, linha própria); edições em uma cópia nunca refletem em outra
+  grupo                   Grupo       @relation(fields: [grupo_id], references: [id]) // Relacionamento com o modelo Grupo - Grupo dono desta cópia
   criadoEm                DateTime    @default(now()) // Data e hora de criação do registro do processo - DateTime - Valor padrão: Data/hora atual (definido apenas na criação)
   atualizadoEm            DateTime    @default(now()) @updatedAt // Data e hora da última atualização do registro - DateTime - Atualizado automaticamente a cada modificação
   andamentos              andamento[] // Lista de andamentos relacionados a este processo - Array de andamento - Histórico completo de movimentações do processo entre unidades
-  grupos                  ProcessoGrupo[] // Vínculos com grupos para suportar visibilidade multi-grupo
 
   // Campos calculados (2026-08-19), mantidos em sincronia por recalcularPrazoEfetivo()
   // sempre que um andamento é criado/editado/removido — replicam a MESMA regra que
@@ -180,6 +169,8 @@ model processo {
   @@index([ativo, criadoEm])
   @@index([prazo])
   @@index([prorrogacao])
+  @@unique([numero_sei, grupo_id])
+  @@index([grupo_id])
   @@map("processos")
 }
 
@@ -249,7 +240,9 @@ model Grupo {
   atualizadoEm DateTime    @default(now()) @updatedAt
 
   usuarios  UsuarioGrupo[]
-  processos ProcessoGrupo[]
+  processos processo[]
+  permissoes GrupoPermissoes[] // Permissões concedidas a este grupo (baseline para qualquer membro com este grupo ativo)
+  permissoesUsuarios UsuarioPermissoes[] // Permissões individuais escopadas a este grupo (ver model UsuarioPermissoes)
 
   @@unique([codigo, tipo])
   @@index([codigo])
@@ -296,23 +289,66 @@ model UsuarioGrupoPermissao {
   @@map("usuarios_grupos_permissoes")
 }
 
-// Model: ProcessoGrupo | Tabela: processos_grupos | Descrição: Vínculo N:N entre processos e grupos com nível de visão por grupo
-model ProcessoGrupo {
-  id           String                  @id @default(uuid())
-  processo_id  String
+// Model: Permissoes | Tabela: permissoes | Descrição: Catálogo de permissões granulares do sistema,
+// namespaced por entidade (ex.: "processo.visualizar_grupo", "andamento.excluir"). Substitui as antigas
+// colunas boolean fixas em UsuarioGrupoPermissao — cada permissão nova é um registro aqui, não uma
+// coluna. Nome no plural (Permissoes) para não colidir com o enum Permissao (papel de sistema
+// DEV/ADM/TEC/USR) — são conceitos diferentes: papel é hierarquia/bypass, isto aqui é concedido item a
+// item.
+model Permissoes {
+  id           String   @id @default(uuid())
+  codigo       String   @unique // ex.: "processo.visualizar_proprios", "andamento.modificar_grupo"
+  descricao    String
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
+
+  grupos   GrupoPermissoes[]
+  usuarios UsuarioPermissoes[]
+
+  @@map("permissoes")
+}
+
+// Model: GrupoPermissoes | Tabela: grupos_permissoes | Descrição: Permissões concedidas como baseline
+// a um grupo, por papel (ADM/TEC/USR) — qualquer usuário com este grupo ativo E este papel dentro
+// dele recebe estas permissões, salvo o próprio usuário não ter vínculo ativo com o grupo.
+model GrupoPermissoes {
+  id           String         @id @default(uuid())
   grupo_id     String
-  nivelVisao   NivelVisaoGrupoProcesso @default(TOTAL)
-  ativo        Boolean                 @default(true)
-  criadoEm     DateTime                @default(now())
-  atualizadoEm DateTime                @default(now()) @updatedAt
+  papel        PermissaoGrupo
+  permissao_id String
+  ativo        Boolean        @default(true)
+  criadoEm     DateTime       @default(now())
 
-  processo     processo @relation(fields: [processo_id], references: [id])
-  grupo        Grupo    @relation(fields: [grupo_id], references: [id])
+  grupo     Grupo      @relation(fields: [grupo_id], references: [id])
+  permissao Permissoes @relation(fields: [permissao_id], references: [id])
 
-  @@unique([processo_id, grupo_id])
-  @@index([processo_id])
+  @@unique([grupo_id, papel, permissao_id])
   @@index([grupo_id])
-  @@map("processos_grupos")
+  @@index([permissao_id])
+  @@map("grupos_permissoes")
+}
+
+// Model: UsuarioPermissoes | Tabela: usuarios_permissoes | Descrição: Permissões concedidas diretamente
+// a um usuário. grupo_id nulo = concessão global, independente do grupo ativo. grupo_id preenchido =
+// concessão escopada a um vínculo (usuario, grupo) específico, só válida enquanto esse vínculo estiver ativo.
+model UsuarioPermissoes {
+  id           String   @id @default(uuid())
+  usuario_id   String
+  grupo_id     String?
+  permissao_id String
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+
+  usuario   Usuario    @relation(fields: [usuario_id], references: [id])
+  grupo     Grupo?     @relation(fields: [grupo_id], references: [id])
+  permissao Permissoes @relation(fields: [permissao_id], references: [id])
+
+  @@unique([usuario_id, grupo_id, permissao_id])
+  @@index([usuario_id])
+  @@index([grupo_id])
+  @@index([permissao_id])
+  @@map("usuarios_permissoes")
 }
 
 // Model: PreferenciasUsuario | Tabela: preferencias_usuario | Descrição: Armazena preferências e configurações personalizadas de cada usuário

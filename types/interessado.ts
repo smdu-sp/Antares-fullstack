@@ -7,3 +7,10 @@ export interface IInteressado {
   atualizadoEm: string;
   ativo?: boolean;
 }
+
+export interface IPaginadoInteressado {
+  data: IInteressado[];
+  total: number;
+  pagina: number;
+  limite: number;
+}

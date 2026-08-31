@@ -13,7 +13,10 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM']);
+    // Parte do fluxo de criação inline de unidade pela grid (reativa uma
+    // unidade inativa com o mesmo nome/sigla) — mesmo motivo do POST /unidades,
+    // não é exclusivo da página admin. Ver components/unidade-autocomplete-editor.tsx.
+    await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
 
     const { id } = await params;
     const unidade = await reativar(id);

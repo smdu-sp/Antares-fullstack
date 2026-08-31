@@ -40,7 +40,7 @@ export default async function Perfil() {
           <CardHeader>
             <CardTitle className="text-base md:text-xl flex items-center gap-5 justify-between">
               {userData.nome}
-              {userData.permissao && <Badge>{userData.permissao}</Badge>}
+              {userData.dev && <Badge>Desenvolvedor</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="bg-card rounded-xl flex justify-center items-center mb-5 h-full">

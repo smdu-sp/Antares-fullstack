@@ -3,7 +3,7 @@ import { jsonResponse } from '@/lib/http/json-response';
 import { handleRouteError } from '@/lib/http/handle-route-error';
 import { requireAuth } from '@/lib/server/auth/session';
 import { requirePermissoes } from '@/lib/server/auth/permissoes';
-import { requireCapacidade } from '@/lib/server/auth/capacidade';
+import { requirePermissao } from '@/lib/server/auth/permissao';
 import { buscarPorId } from '@/lib/server/andamentos/buscar-por-id';
 import { atualizar } from '@/lib/server/andamentos/atualizar';
 import { remover } from '@/lib/server/andamentos/remover';
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
-    await requireCapacidade(usuario.id, 'andamento.visualizar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'andamento.visualizar', request.headers.get('x-grupo-ativo-id'));
 
     const { id } = await params;
     const resultado = await buscarPorId(id, usuario.id);
@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC']);
-    await requireCapacidade(usuario.id, 'andamento.modificar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'andamento.modificar', request.headers.get('x-grupo-ativo-id'));
 
     const { id } = await params;
     const body = await request.json();
@@ -52,7 +52,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['DEV', 'ADM', 'TEC']);
-    await requireCapacidade(usuario.id, 'andamento.excluir', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'andamento.excluir', request.headers.get('x-grupo-ativo-id'));
 
     const { id } = await params;
     const resultado = await remover(id, usuario.id);

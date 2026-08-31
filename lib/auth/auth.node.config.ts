@@ -14,7 +14,6 @@ import { prisma } from "@/lib/prisma";
 import { validateCredentials } from "@/lib/server/auth/validate-credentials";
 import { getTokens } from "@/lib/server/auth/tokens";
 import { obterGrupoAtivo } from "@/lib/server/auth/obter-grupo-ativo";
-import { validaUsuario } from "@/lib/server/usuarios/valida-usuario";
 
 function asNonEmptyString(value: unknown): string {
   if (typeof value === "string") return value.trim();
@@ -180,7 +179,12 @@ export default {
             const usuario = await validateCredentials(login, senha);
             // O shape retornado ({access_token, refresh_token}) não é o `User` padrão do
             // NextAuth — é assim desde a versão original (baseada em fetch + JSON solto).
-            return getTokens(usuario) as unknown as import("next-auth").User;
+            // versao_sessao vai junto só pra virar o snapshot gravado no token no
+            // momento do login (ver jwt() abaixo) — não tem outro uso aqui.
+            return {
+              ...getTokens(usuario),
+              versao_sessao: usuario.versao_sessao,
+            } as unknown as import("next-auth").User;
           } catch (error) {
             console.error(
               "Erro na autenticação:",
@@ -200,7 +204,7 @@ export default {
           const tokenUser = token.user as {
             usuario?: {
               avatar?: string;
-              permissao?: string;
+              dev?: boolean;
               nomeSocial?: string;
             };
             grupoAtivo?: unknown;
@@ -208,14 +212,33 @@ export default {
 
           if (tokenUser.usuario) {
             tokenUser.usuario.avatar = session.usuario.avatar;
-            tokenUser.usuario.permissao = session.usuario.permissao;
+            tokenUser.usuario.dev = session.usuario.dev;
             tokenUser.usuario.nomeSocial = session.usuario.nomeSocial;
           }
-          tokenUser.grupoAtivo = session.grupoAtivo;
+          // Normaliza pelo mesmo caminho usado no refresh natural (abaixo): o
+          // payload que o cliente manda pro update() pode vir em formatos de
+          // aninhamento diferentes (ex.: resposta crua do PATCH /grupo-ativo),
+          // e usar session.grupoAtivo direto sem normalizar já deixou a sessão
+          // sem `id` no nível certo — grid de processos ficava em branco até o
+          // próximo refresh natural.
+          const grupoNormalizadoUpdate = normalizarGrupoAtivo(session.grupoAtivo);
+          if (grupoNormalizadoUpdate) {
+            tokenUser.grupoAtivo = grupoNormalizadoUpdate;
+          }
           return token;
         }
       }
-      if (user) token.user = user;
+      if (user) {
+        token.user = user;
+        // Carimbo gravado só no login de verdade (nunca mais tocado depois) — é
+        // contra ele que toda requisição seguinte compara versao_sessao (abaixo).
+        // Fica fora de token.user de propósito: o access_token interno é
+        // re-emitido com dado sempre atual a cada refresh de 15min (ver
+        // session() abaixo), então guardar o carimbo lá deixaria a sessão se
+        // "autocorrigir" sozinha em vez de forçar um novo login de verdade.
+        const usuarioLogado = user as unknown as { versao_sessao?: number };
+        token.versaoSessaoLogin = usuarioLogado.versao_sessao ?? null;
+      }
 
       // Mantém o grupoAtivo persistido no próprio cookie de sessão, resolvido aqui
       // (Node, com Prisma) em toda requisição — isso é o que permite o middleware
@@ -229,6 +252,27 @@ export default {
         try {
           const { sub } = jwtDecode<{ sub?: string }>(tokenUser.access_token);
           if (sub) {
+            // Deslogamento forçado: se o usuário sumiu/foi desativado, ou se os
+            // vínculos de grupo dele mudaram desde o login (vincularUsuarioGrupo
+            // incrementa versao_sessao a cada mudança), a sessão já aberta morre
+            // aqui — return null é o jeito reconhecido de derrubar sessão do lado
+            // servidor num callback jwt() (v. discussão #7573 no repo do Auth.js).
+            const usuarioAtual = await prisma.usuario.findUnique({
+              where: { id: sub },
+              select: { versao_sessao: true, status: true },
+            });
+
+            if (!usuarioAtual || !usuarioAtual.status) {
+              return null;
+            }
+
+            if (
+              typeof token.versaoSessaoLogin === "number" &&
+              usuarioAtual.versao_sessao !== token.versaoSessaoLogin
+            ) {
+              return null;
+            }
+
             const grupoAtivoResponse = await obterGrupoAtivo(sub);
             const grupoNormalizado = normalizarGrupoAtivo(grupoAtivoResponse);
             if (grupoNormalizado) {
@@ -270,15 +314,6 @@ export default {
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
             console.warn("Erro ao renovar token:", error);
-          }
-        }
-      }
-      if (session.access_token && session.usuario?.sub) {
-        try {
-          await validaUsuario(session.usuario.sub);
-        } catch (error) {
-          if (process.env.NODE_ENV === "development") {
-            console.warn("Erro ao validar usuário:", error);
           }
         }
       }

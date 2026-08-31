@@ -879,12 +879,12 @@ const data_unidades = [
 ];
 
 const data_usuarios = [
-  { id: "60bdfd8b-8e4e-40f5-9d16-b4f9ff4f3aeb", nome: "Thamyris Abreu", nomeSocial: null, login: "d955166", email: "tbabreu@prefeitura.sp.gov.br", permissao: "ADM", status: 1, avatar: null, ultimoLogin: "2026-05-20 13:33:37.870", criadoEm: "2025-11-19 16:01:28.597", atualizadoEm: "2026-05-20 13:33:37.873", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
-  { id: "6843ed8e-b8c5-4d3a-a5b2-6d6d507a8c19", nome: "Usuario Coordenadoria Servin", nomeSocial: null, login: "userser", email: "user.servin@prefeitura.sp.gov.br", permissao: "USR", status: 1, avatar: null, ultimoLogin: "2026-03-31 17:47:28.391", criadoEm: "2026-03-31 16:55:16.048", atualizadoEm: "2026-03-31 17:47:28.391", unidade_id: "36a623eb-d47e-481e-8d22-f26dee5ec4a8" },
-  { id: "9a97724e-70f0-4bd6-8f6c-cf87db0c87ed", nome: "Usuario Teste Expediente", nomeSocial: null, login: "x859317", email: "user.expediente.1776197859317@exemplo.local", permissao: "USR", status: 1, avatar: null, ultimoLogin: "2026-05-08 15:53:58.128", criadoEm: "2026-04-14 20:17:39.319", atualizadoEm: "2026-05-08 15:53:58.135", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
-  { id: "d79bdf59-67a3-43bd-bee9-cb2074bd7c37", nome: "Administrador", nomeSocial: null, login: "x123456", email: "x123456@prefeitura.sp.gov.br", permissao: "USR", status: 1, avatar: null, ultimoLogin: "2026-03-30 19:37:42.640", criadoEm: "2026-03-30 19:37:42.640", atualizadoEm: "2026-03-30 19:37:42.640", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
-  { id: "dd067889-7a10-4ab0-ba93-629c5a8c558a", nome: "Usuario Teste Servin", nomeSocial: null, login: "x858888", email: "user.servin.1776197858888@exemplo.local", permissao: "USR", status: 1, avatar: null, ultimoLogin: "2026-05-08 15:53:29.961", criadoEm: "2026-04-14 20:17:38.892", atualizadoEm: "2026-05-08 15:53:29.963", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
-  { id: "e2e8b11f-a0a3-4cf5-ae76-a707481c9adf", nome: "Victor Alexander Menezes de Abreu", nomeSocial: null, login: "d927014", email: "vmabreu@prefeitura.sp.gov.br", permissao: "USR", status: 1, avatar: null, ultimoLogin: "2026-02-13 14:13:54.735", criadoEm: "2026-02-13 02:29:52.483", atualizadoEm: "2026-02-13 14:13:54.736", unidade_id: "10e1441a-9de9-4de8-9c5b-30a77c69482f" },
+  { id: "60bdfd8b-8e4e-40f5-9d16-b4f9ff4f3aeb", nome: "Thamyris Abreu", nomeSocial: null, login: "d955166", email: "tbabreu@prefeitura.sp.gov.br", status: 1, avatar: null, ultimoLogin: "2026-05-20 13:33:37.870", criadoEm: "2025-11-19 16:01:28.597", atualizadoEm: "2026-05-20 13:33:37.873", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
+  { id: "6843ed8e-b8c5-4d3a-a5b2-6d6d507a8c19", nome: "Usuario Coordenadoria Servin", nomeSocial: null, login: "userser", email: "user.servin@prefeitura.sp.gov.br", status: 1, avatar: null, ultimoLogin: "2026-03-31 17:47:28.391", criadoEm: "2026-03-31 16:55:16.048", atualizadoEm: "2026-03-31 17:47:28.391", unidade_id: "36a623eb-d47e-481e-8d22-f26dee5ec4a8" },
+  { id: "9a97724e-70f0-4bd6-8f6c-cf87db0c87ed", nome: "Usuario Teste Expediente", nomeSocial: null, login: "x859317", email: "user.expediente.1776197859317@exemplo.local", status: 1, avatar: null, ultimoLogin: "2026-05-08 15:53:58.128", criadoEm: "2026-04-14 20:17:39.319", atualizadoEm: "2026-05-08 15:53:58.135", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
+  { id: "d79bdf59-67a3-43bd-bee9-cb2074bd7c37", nome: "Administrador", nomeSocial: null, login: "x123456", email: "x123456@prefeitura.sp.gov.br", status: 1, avatar: null, ultimoLogin: "2026-03-30 19:37:42.640", criadoEm: "2026-03-30 19:37:42.640", atualizadoEm: "2026-03-30 19:37:42.640", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
+  { id: "dd067889-7a10-4ab0-ba93-629c5a8c558a", nome: "Usuario Teste Servin", nomeSocial: null, login: "x858888", email: "user.servin.1776197858888@exemplo.local", status: 1, avatar: null, ultimoLogin: "2026-05-08 15:53:29.961", criadoEm: "2026-04-14 20:17:38.892", atualizadoEm: "2026-05-08 15:53:29.963", unidade_id: "b66575a4-5236-4eb0-9fc8-99b0ab23d2fc" },
+  { id: "e2e8b11f-a0a3-4cf5-ae76-a707481c9adf", nome: "Victor Alexander Menezes de Abreu", nomeSocial: null, login: "d927014", email: "vmabreu@prefeitura.sp.gov.br", status: 1, avatar: null, ultimoLogin: "2026-02-13 14:13:54.735", criadoEm: "2026-02-13 02:29:52.483", atualizadoEm: "2026-02-13 14:13:54.736", unidade_id: "10e1441a-9de9-4de8-9c5b-30a77c69482f" },
 ];
 
 const data_usuarios_grupos = [
@@ -903,6 +903,21 @@ const data_usuarios_grupos_permissoes = [
   { id: "e8c4566c-7802-4de6-a341-fa151faf36aa", usuario_grupo_id: "9276f924-c2ff-4074-bf9a-59718828ccf2", visualizar_proprios: 1, visualizar_grupo: 1, modificar_proprios: 1, modificar_grupo: 0, excluir: 0, ativo: 1, criadoEm: "2026-04-14 20:17:39.741", atualizadoEm: "2026-04-14 20:17:39.741" },
 ];
 
+// processo.grupo_id passou a ser direto (cada grupo tem sua própria cópia do
+// processo) em vez da antiga tabela de junção processos_grupos — este snapshot é
+// de antes dessa mudança, então derivamos grupo_id de data_processos_grupos aqui
+// (mesma regra usada na migration: vínculo ativo mais antigo por processo).
+const grupoIdPorProcesso = new Map<string, string>();
+for (const vinculo of [...data_processos_grupos].sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))) {
+  if (vinculo.ativo && !grupoIdPorProcesso.has(vinculo.processo_id)) {
+    grupoIdPorProcesso.set(vinculo.processo_id, vinculo.grupo_id);
+  }
+}
+const data_processos_com_grupo = data_processos.map((processo) => ({
+  ...processo,
+  grupo_id: grupoIdPorProcesso.get(processo.id) ?? data_grupos[0].id,
+}));
+
 async function main() {
   await seedTable(prisma.andamento, data_andamentos, 'andamentos');
   await seedTable(prisma.grupo, data_grupos, 'grupos');
@@ -910,8 +925,7 @@ async function main() {
   await seedTable(prisma.log, data_logs, 'logs');
   await seedTable(prisma.origemProcesso, data_origens_processo, 'origens_processo');
   await seedTable(prisma.preferenciasUsuario, data_preferencias_usuario, 'preferencias_usuario');
-  await seedTable(prisma.processo, data_processos, 'processos');
-  await seedTable(prisma.processoGrupo, data_processos_grupos, 'processos_grupos');
+  await seedTable(prisma.processo, data_processos_com_grupo, 'processos');
   await seedTable(prisma.unidade, data_unidades, 'unidades');
   await seedTable(prisma.usuario, data_usuarios, 'usuarios');
   await seedTable(prisma.usuarioGrupo, data_usuarios_grupos, 'usuarios_grupos');

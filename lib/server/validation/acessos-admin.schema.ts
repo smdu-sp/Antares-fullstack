@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GrupoCodigo, GrupoTipo, NivelVisaoGrupoProcesso, PermissaoGrupo } from '@prisma/client';
+import { GrupoCodigo, GrupoTipo, PermissaoGrupo } from '@prisma/client';
 
 /** Porte de CreateGrupoDto (Antares-backend/src/acessos-admin/dto/create-grupo.dto.ts). */
 export const createGrupoSchema = z.object({
@@ -17,24 +17,19 @@ export const vincularUsuarioGrupoSchema = z.object({
   permissao_grupo: z.nativeEnum(PermissaoGrupo).optional(),
 });
 
-/** Porte de AtualizarPermissoesUsuarioGrupoDto. */
-export const atualizarPermissoesUsuarioGrupoSchema = z.object({
-  visualizar_proprios: z.boolean().optional(),
-  visualizar_grupo: z.boolean().optional(),
-  modificar_proprios: z.boolean().optional(),
-  modificar_grupo: z.boolean().optional(),
-  excluir: z.boolean().optional(),
-  ativo: z.boolean().optional(),
+/** Lista completa de códigos de Permissoes desejados para um (usuário, grupo|global). */
+export const atualizarPermissoesUsuarioSchema = z.object({
+  codigos: z.array(z.string().min(1)),
 });
 
-/** Porte de VincularProcessoGrupoDto (Antares-backend/src/acessos-admin/dto/vincular-processo-grupo.dto.ts). */
-export const vincularProcessoGrupoSchema = z.object({
-  nivelVisao: z.nativeEnum(NivelVisaoGrupoProcesso).optional(),
-  ativo: z.boolean().optional(),
+/** Lista completa de códigos de Permissoes desejados para um (grupo, papel). */
+export const atualizarPermissoesGrupoSchema = z.object({
+  papel: z.nativeEnum(PermissaoGrupo),
+  codigos: z.array(z.string().min(1)),
 });
 
 export type CreateGrupoInput = z.infer<typeof createGrupoSchema>;
 export type UpdateGrupoInput = z.infer<typeof updateGrupoSchema>;
 export type VincularUsuarioGrupoInput = z.infer<typeof vincularUsuarioGrupoSchema>;
-export type AtualizarPermissoesUsuarioGrupoInput = z.infer<typeof atualizarPermissoesUsuarioGrupoSchema>;
-export type VincularProcessoGrupoInput = z.infer<typeof vincularProcessoGrupoSchema>;
+export type AtualizarPermissoesUsuarioInput = z.infer<typeof atualizarPermissoesUsuarioSchema>;
+export type AtualizarPermissoesGrupoInput = z.infer<typeof atualizarPermissoesGrupoSchema>;

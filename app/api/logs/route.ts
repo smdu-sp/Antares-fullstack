@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 export async function GET(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['DEV', 'ADM']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { searchParams } = new URL(request.url);
     const pagina = Number(searchParams.get('pagina')) || undefined;

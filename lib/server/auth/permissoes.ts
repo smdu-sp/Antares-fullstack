@@ -2,41 +2,35 @@ import { prisma } from '@/lib/prisma';
 import { AuthError } from './errors';
 import { resolverVinculoPapel } from './grupo-ativo';
 
-const PAPEIS_SISTEMA = ['DEV', 'ADM'];
-const PAPEIS_GRUPO = ['ADM', 'TEC', 'USR'];
-
 /**
  * Porte de RoleGuard (Antares-backend/src/auth/guards/role.guard.ts).
  * Corresponde ao decorator @Permissoes(...) do NestJS — chamar antes de
- * requireCapacidade() na mesma ordem em que os guards globais rodavam
- * (Jwt -> Role -> Capacidade).
+ * requirePermissao() na mesma ordem em que os guards globais rodavam
+ * (Jwt -> Role -> Permissao).
+ *
+ * `'DEV'` no array `permissoes` só documenta que a rota também é acessível a
+ * desenvolvedores — o bypass em si já é resolvido por `usuario.dev` antes de
+ * qualquer checagem de papel. Fora isso, todo o resto do array (`ADM`/`TEC`/`USR`)
+ * é checado contra o papel do usuário no grupo ativo, nunca contra um campo de
+ * sistema — não existe mais "papel de sistema" ADM/TEC/USR (ver decisão 2026-08-14).
  */
 export async function requirePermissoes(usuarioId: string, permissoes: string[]): Promise<void> {
   const usuario = await prisma.usuario.findUnique({
     where: { id: usuarioId },
-    select: { permissao: true, status: true },
+    select: { dev: true, status: true },
   });
 
   if (!usuario || !usuario.status) throw new AuthError(403);
 
-  // Sem permissões declaradas: delega para requireCapacidade().
+  // Sem permissões declaradas: delega para requirePermissao().
   if (permissoes.length === 0) return;
 
-  // Simplificação decidida pela usuária (2026-08-14): só DEV tem bypass de sistema —
-  // o grupo GLOBAL deixou de existir como bypass (virou só permissão de sistema, DEV).
-  if (usuario.permissao === 'DEV') return;
+  if (usuario.dev) return;
 
-  const permissoesSistema = permissoes.filter((item) => PAPEIS_SISTEMA.includes(item));
-  const permissoesGrupo = permissoes.filter((item) => PAPEIS_GRUPO.includes(item));
+  const papeisGrupo = permissoes.filter((item) => item !== 'DEV');
+  if (papeisGrupo.length === 0) throw new AuthError(403); // rota exclusiva de DEV
 
-  // Rota pede apenas papel de sistema: valida direto no usuário.
-  if (permissoesGrupo.length === 0) {
-    if (!permissoesSistema.includes(usuario.permissao)) throw new AuthError(403);
-    return;
-  }
-
-  // Rota de negócio: valida papel no grupo ativo.
   const vinculoAtivo = await resolverVinculoPapel(usuarioId);
   if (!vinculoAtivo) throw new AuthError(403);
-  if (!permissoesGrupo.includes(vinculoAtivo.permissao_grupo)) throw new AuthError(403);
+  if (!papeisGrupo.includes(vinculoAtivo.permissao_grupo)) throw new AuthError(403);
 }

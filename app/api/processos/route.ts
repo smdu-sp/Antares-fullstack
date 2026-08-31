@@ -3,7 +3,7 @@ import { jsonResponse } from '@/lib/http/json-response';
 import { handleRouteError } from '@/lib/http/handle-route-error';
 import { requireAuth } from '@/lib/server/auth/session';
 import { requirePermissoes } from '@/lib/server/auth/permissoes';
-import { requireCapacidade } from '@/lib/server/auth/capacidade';
+import { requirePermissao } from '@/lib/server/auth/permissao';
 import { criar } from '@/lib/server/processos/criar';
 import { buscarTudo } from '@/lib/server/processos/buscar-tudo';
 import { createProcessoSchema } from '@/lib/server/validation/processos.schema';
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
-    await requireCapacidade(usuario.id, 'processo.modificar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'processo.modificar', request.headers.get('x-grupo-ativo-id'));
 
     const body = await request.json();
     const dados = createProcessoSchema.parse(body);
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
-    await requireCapacidade(usuario.id, 'processo.visualizar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'processo.visualizar', request.headers.get('x-grupo-ativo-id'));
 
     const { searchParams } = new URL(request.url);
     const pagina = Number(searchParams.get('pagina')) || undefined;

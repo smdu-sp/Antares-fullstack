@@ -27,7 +27,6 @@ const formSchema = z.object({
   nome: z.string().min(2).max(50),
   login: z.string(),
   email: z.string().email(),
-  permissao: z.enum(["DEV", "TEC", "ADM", "USR"]),
 });
 
 interface FormProfileProps {
@@ -47,8 +46,6 @@ export default function FormProfile({ user, id }: FormProfileProps) {
       email: user.email || "",
       nome: user.nome || "",
       login: user.login || "",
-      permissao:
-        (user.permissao as unknown as "DEV" | "TEC" | "ADM" | "USR") ?? "USR",
     },
   });
 

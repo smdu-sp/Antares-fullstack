@@ -9,13 +9,13 @@ import { usuarioTemPermissaoGrupoNoProcesso } from './usuario-tem-permissao-grup
 export async function remover(id: string, usuario_id: string) {
   const processo = await buscarPorId(id, usuario_id);
 
-  const usuarioAtual = await prisma.usuario.findUnique({ where: { id: usuario_id }, select: { permissao: true } });
+  const usuarioAtual = await prisma.usuario.findUnique({ where: { id: usuario_id }, select: { dev: true } });
 
   const processoPermissao = await prisma.processo.findUnique({
     where: { id },
     select: {
       usuario_atribuido_id: true,
-      grupos: { where: { ativo: true }, select: { grupo: { select: { id: true } } } },
+      grupo_id: true,
     },
   });
 
@@ -24,8 +24,7 @@ export async function remover(id: string, usuario_id: string) {
       ? await usuarioTemPermissaoGrupoNoProcesso(usuario_id, processoPermissao, 'excluir')
       : false;
 
-  // Simplificação decidida pela usuária (2026-08-14): só DEV tem bypass de sistema.
-  if (usuarioAtual && usuarioAtual.permissao !== 'DEV' && !temPermissaoGrupoExcluir) {
+  if (usuarioAtual && !usuarioAtual.dev && !temPermissaoGrupoExcluir) {
     throw new HttpError(403, 'Você não tem permissão de grupo para excluir este processo.');
   }
 

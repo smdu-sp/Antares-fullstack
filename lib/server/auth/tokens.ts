@@ -16,7 +16,7 @@ export function getTokens(usuario: Usuario): UsuarioTokenPair {
     email: usuario.email,
     status: usuario.status,
     avatar: usuario.avatar ?? undefined,
-    permissao: usuario.permissao,
+    dev: usuario.dev,
   };
 
   const access_token = jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: '15m' });

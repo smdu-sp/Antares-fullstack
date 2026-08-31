@@ -14,14 +14,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { atualizarGrupoAtivo } from "@/services/grupo-ativo";
+import { useGrupoAtivoLoading } from "./grupo-ativo-loading-context";
 
 export default function GrupoAtivoSelector() {
   const router = useRouter();
   const { data: session, update } = useSession();
   const [isPending, startTransition] = useTransition();
+  const { setTrocando } = useGrupoAtivoLoading();
   const [selected, setSelected] = useState<string>(
     session?.grupoAtivo?.id || "",
   );
+
+  useEffect(() => {
+    setTrocando(isPending);
+  }, [isPending, setTrocando]);
 
   const grupos = useMemo(() => {
     const disponiveis = session?.grupoAtivo?.gruposDisponiveis || [];

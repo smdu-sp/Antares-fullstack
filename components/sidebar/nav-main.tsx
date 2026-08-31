@@ -8,7 +8,7 @@ import {
   FileText,
   Building2,
   UserCircle,
-  ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 
 import {
@@ -26,7 +26,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-import { canAdmin } from "@/lib/access-control";
 import { auth } from "@/lib/auth/auth";
 import { ForwardRefExoticComponent, RefAttributes } from "react";
 import Link from "../link";
@@ -34,6 +33,7 @@ import Link from "../link";
 export async function NavMain() {
   const session = await auth();
   const usuario = session?.usuario;
+  const isDev = usuario?.dev === true;
   interface IMenu {
     icone: ForwardRefExoticComponent<
       Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>
@@ -74,24 +74,16 @@ export async function NavMain() {
       titulo: "Interessados",
       url: "/interessados",
     },
-    ...(session?.usuario?.permissao === "DEV"
-      ? [
-          {
-            icone: ShieldCheck,
-            titulo: "Grupos de Acesso",
-            url: "/grupos-acesso",
-          },
-        ]
-      : []),
-    ...(canAdmin(session)
-      ? [
-          {
-            icone: FileText,
-            titulo: "Logs",
-            url: "/logs",
-          },
-        ]
-      : []),
+    {
+      icone: KeyRound,
+      titulo: "Permissões",
+      url: "/permissoes",
+    },
+    {
+      icone: FileText,
+      titulo: "Logs",
+      url: "/logs",
+    },
   ];
 
   return (
@@ -146,7 +138,7 @@ export async function NavMain() {
             </SidebarMenu>
           </>
         )}
-        {menuAdmin && usuario && canAdmin(session) && (
+        {menuAdmin && usuario && isDev && (
           <>
             <SidebarGroupLabel>Administração</SidebarGroupLabel>
             <SidebarMenu>

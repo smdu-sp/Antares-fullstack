@@ -1,4 +1,4 @@
-import { Permissao, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { verificaLimite, verificaPagina } from '@/lib/server/pagination';
 
@@ -7,7 +7,7 @@ export async function listarPermissoesDev(
   paginaInput?: number,
   limiteInput?: number,
   busca?: string,
-  permissao?: string,
+  dev?: string,
   status?: string,
 ) {
   // Nota: o parâmetro `limite=20` do método original do backend é sobrescrito
@@ -19,7 +19,7 @@ export async function listarPermissoesDev(
     ...(busca && {
       OR: [{ nome: { contains: busca } }, { login: { contains: busca } }, { email: { contains: busca } }],
     }),
-    ...(permissao && permissao !== '' && { permissao: permissao as Permissao }),
+    ...(dev && dev !== '' && { dev: dev === 'true' }),
     ...(status &&
       status !== '' && {
         status: status === 'ATIVO' ? true : status === 'INATIVO' ? false : undefined,

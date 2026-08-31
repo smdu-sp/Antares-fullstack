@@ -3,20 +3,17 @@ import { jsonResponse } from '@/lib/http/json-response';
 import { handleRouteError } from '@/lib/http/handle-route-error';
 import { requireAuth } from '@/lib/server/auth/session';
 import { requirePermissoes } from '@/lib/server/auth/permissoes';
-import { listarGruposProcesso } from '@/lib/server/acessos-admin/listar-grupos-processo';
+import { listarPermissoes } from '@/lib/server/acessos-admin/listar-permissoes';
 
 export const runtime = 'nodejs';
 
-type Params = { params: Promise<{ processoId: string }> };
-
-/** Porte de AcessosAdminController.listarGruposProcesso (GET /acessos-admin/dev/processos/:processoId/grupos). */
-export async function GET(request: NextRequest, { params }: Params) {
+/** Catálogo de permissões ativas (GET /acessos-admin/dev/permissoes), para o painel DEV. */
+export async function GET(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['DEV']);
 
-    const { processoId } = await params;
-    const resultado = await listarGruposProcesso(processoId);
+    const resultado = await listarPermissoes();
 
     return jsonResponse(resultado);
   } catch (error) {

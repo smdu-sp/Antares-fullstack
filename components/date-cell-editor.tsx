@@ -8,6 +8,19 @@ import "dayjs/locale/pt-br";
 dayjs.extend(customParseFormat);
 dayjs.locale("pt-br");
 
+// Marca o popup do calendário pra poder localizar (e limpar) instâncias órfãs
+// deixadas no body por uma sessão de edição anterior que não chamou destroy()
+// corretamente (ex.: linha reciclada/recarregada pelo AG-Grid enquanto o
+// calendário estava aberto) — é isso que fazia o seletor ficar "travado" na
+// tela, sem fechar no clique fora nem responder à seleção de data.
+const CALENDAR_MARKER_ATTR = "data-date-cell-editor-calendar";
+
+function removerCalendariosOrfaos() {
+  document
+    .querySelectorAll(`[${CALENDAR_MARKER_ATTR}]`)
+    .forEach((el) => el.parentElement?.removeChild(el));
+}
+
 export default class DateCellEditor implements ICellEditorComp {
   value: Date | null = null;
   params!: ICellEditorParams;
@@ -19,6 +32,9 @@ export default class DateCellEditor implements ICellEditorComp {
   closeListener: ((event: MouseEvent) => void) | null = null;
 
   init(params: ICellEditorParams): void {
+    // Uma sessão de edição nova começando é a melhor oportunidade de limpar
+    // qualquer calendário órfão de uma sessão anterior mal encerrada.
+    removerCalendariosOrfaos();
     this.params = params;
     this.value = params.value || null;
     // Converter data inicial para formato DD/MM/YYYY
@@ -274,6 +290,7 @@ export default class DateCellEditor implements ICellEditorComp {
     this.calendarContainer.style.boxShadow = "0 4px 12px rgba(0,0,0,0.25)";
     this.calendarContainer.style.minWidth = "280px";
     this.calendarContainer.style.pointerEvents = "auto";
+    this.calendarContainer.setAttribute(CALENDAR_MARKER_ATTR, "true");
 
     // Impedir que cliques no calendário disparem o close listener
     this.calendarContainer.addEventListener("click", (e) => {
@@ -317,8 +334,7 @@ export default class DateCellEditor implements ICellEditorComp {
 
         // Fechar ao clicar fora - remover listener anterior se existir
         if (this.closeListener) {
-          document.removeEventListener("click", this.closeListener);
-          document.removeEventListener("mousedown", this.closeListener);
+          document.removeEventListener("mousedown", this.closeListener, true);
         }
 
         this.closeListener = (event: MouseEvent) => {
@@ -332,17 +348,24 @@ export default class DateCellEditor implements ICellEditorComp {
             // Clique foi fora - fechar calendário
             this.calendarOpen = false;
             this.calendarContainer.style.display = "none";
-            document.removeEventListener("mousedown", this.closeListener!);
+            document.removeEventListener(
+              "mousedown",
+              this.closeListener!,
+              true,
+            );
             this.closeListener = null;
           }
         };
 
-        // Usar apenas mousedown para consistência com os botões de data
-        document.addEventListener("mousedown", this.closeListener);
+        // Fase de captura: garante que o clique fora seja detectado mesmo se
+        // algum outro elemento (ex.: outra célula do AG-Grid) chamar
+        // stopPropagation() durante o bubbling — era essa a causa mais provável
+        // do calendário "travar" sem fechar ao clicar fora.
+        document.addEventListener("mousedown", this.closeListener, true);
       } else {
         this.calendarContainer.style.display = "none";
         if (this.closeListener) {
-          document.removeEventListener("mousedown", this.closeListener);
+          document.removeEventListener("mousedown", this.closeListener, true);
           this.closeListener = null;
         }
       }
@@ -398,7 +421,7 @@ export default class DateCellEditor implements ICellEditorComp {
   destroy(): void {
     // Limpar listeners quando o editor for destruído
     if (this.closeListener) {
-      document.removeEventListener("mousedown", this.closeListener);
+      document.removeEventListener("mousedown", this.closeListener, true);
       this.closeListener = null;
     }
 
@@ -406,5 +429,10 @@ export default class DateCellEditor implements ICellEditorComp {
     if (this.calendarContainer && this.calendarContainer.parentElement) {
       this.calendarContainer.parentElement.removeChild(this.calendarContainer);
     }
+
+    // Segurança extra: se por algum motivo o AG-Grid não chamou destroy() a
+    // tempo (ex.: linha reciclada durante a edição) e uma nova sessão de
+    // edição já teria varrido órfãos no init(), varre de novo aqui também.
+    removerCalendariosOrfaos();
   }
 }

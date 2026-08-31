@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { HttpError } from '@/lib/server/http-error';
 import type { UpdateUsuarioInput } from '@/lib/server/validation/usuarios.schema';
 import { buscarPorLogin } from './buscar-por-login';
-import { validaPermissaoCriador } from './valida-permissao-criador';
+import { validaDevCriador } from './valida-dev-criador';
 import { sincronizarGrupoLegado } from './sincronizar-grupo-legado';
 
 /** Porte de UsuariosService.atualizar (Antares-backend/src/usuarios/usuarios.service.ts). */
@@ -23,10 +23,7 @@ export async function atualizar(usuarioLogado: Usuario, id: string, dados: Updat
     if (!unidade) throw new HttpError(400, 'Unidade não encontrada.');
   }
 
-  const permissao =
-    dados.permissao && dados.permissao.toString() !== ''
-      ? validaPermissaoCriador(dados.permissao, usuarioLogado.permissao)
-      : usuarioAntes.permissao;
+  const dev = dados.dev !== undefined ? validaDevCriador(dados.dev, usuarioLogado.dev) : usuarioAntes.dev;
 
   const usuarioAtualizado = await prisma.usuario.update({
     where: { id },
@@ -38,7 +35,7 @@ export async function atualizar(usuarioLogado: Usuario, id: string, dados: Updat
       status: dados.status,
       avatar: dados.avatar,
       unidade_id: dados.unidade_id,
-      permissao,
+      dev,
     },
   });
 

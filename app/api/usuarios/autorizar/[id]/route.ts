@@ -13,7 +13,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { id } = await params;
     const resultado = await autorizar(id);

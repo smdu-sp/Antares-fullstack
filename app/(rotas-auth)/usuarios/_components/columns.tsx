@@ -3,6 +3,11 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { canAdmin, canEdit } from "@/lib/access-control";
 import { IUsuario } from "@/types/usuario";
 import { ColumnDef } from "@tanstack/react-table";
@@ -11,27 +16,54 @@ import ModalDelete from "./modal-delete";
 import ModalGovernancaDev from "./modal-governanca-dev";
 import ModalUpdateCreate from "./modal-update-create";
 
-function hasGrupoVinculado(user: IUsuario): boolean {
-  const raw = user as unknown as {
-    grupoId?: string;
-    grupo_id?: string;
-    grupos?: Array<{ id?: string }>;
-  };
+const MAX_GRUPOS_VISIVEIS = 2;
 
-  return Boolean(raw.grupoId || raw.grupo_id || raw.grupos?.[0]?.id);
-}
+function GruposCell({ grupos }: { grupos: IUsuario["grupos"] }) {
+  const lista = grupos || [];
 
-function getConfiguracaoDevStatus(user: IUsuario): "aplicada" | "pendente" {
-  const hasGrupo = hasGrupoVinculado(user);
+  if (lista.length === 0) {
+    return <div className="text-center text-muted-foreground">-</div>;
+  }
 
-  return hasGrupo ? "aplicada" : "pendente";
+  const visiveis = lista.slice(0, MAX_GRUPOS_VISIVEIS);
+  const ocultos = lista.slice(MAX_GRUPOS_VISIVEIS);
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1">
+      {visiveis.map(({ grupo }) => (
+        <Badge key={grupo.id} variant="secondary">
+          {grupo.nome}
+        </Badge>
+      ))}
+      {ocultos.length > 0 && (
+        <HoverCard openDelay={100}>
+          <HoverCardTrigger asChild>
+            <Badge variant="outline" className="cursor-default">
+              +{ocultos.length}
+            </Badge>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-auto max-w-xs">
+            <div className="flex flex-wrap gap-1">
+              {ocultos.map(({ grupo }) => (
+                <Badge key={grupo.id} variant="secondary">
+                  {grupo.nome}
+                </Badge>
+              ))}
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      )}
+    </div>
+  );
 }
 
 function UserActionsCell({ user }: { user: IUsuario }) {
   const { data: session } = useSession();
-  const hasEditPermission = canEdit(session?.usuario);
-  const hasAdminPermission = canAdmin(session?.usuario);
-  const isDev = session?.usuario?.permissao === "DEV";
+  // canEdit/canAdmin precisam da sessão inteira, não só session.usuario (ver
+  // mesma correção em modal-delete-processo.tsx).
+  const hasEditPermission = canEdit(session);
+  const hasAdminPermission = canAdmin(session);
+  const isDev = session?.usuario?.dev === true;
 
   if (!hasEditPermission) {
     return (
@@ -72,19 +104,9 @@ export const columns: ColumnDef<IUsuario>[] = [
     },
   },
   {
-    accessorKey: "configuracaoDev",
-    header: "Configuração DEV",
-    cell: ({ row }) => {
-      const status = getConfiguracaoDevStatus(row.original);
-
-      return (
-        <div className="flex items-center justify-center">
-          <Badge variant={status === "aplicada" ? "default" : "secondary"}>
-            {status === "aplicada" ? "Aplicada" : "Pendente"}
-          </Badge>
-        </div>
-      );
-    },
+    accessorKey: "grupos",
+    header: "Grupo",
+    cell: ({ row }) => <GruposCell grupos={row.original.grupos} />,
   },
   {
     accessorKey: "status",

@@ -20,9 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import * as usuario from "@/services/usuarios";
 import { listaCompleta } from "@/services/unidades/query-functions";
-import { IPermissao, IUsuario } from "@/types/usuario";
+import {
+  listarGruposDev,
+  atualizarGrupoUsuarioDev,
+  type GrupoDev,
+} from "@/services/acessos-admin";
+import { IUsuario } from "@/types/usuario";
 import { IUnidade } from "@/types/unidade";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -36,8 +42,10 @@ const formSchemaUsuario = z.object({
   nome: z.string(),
   login: z.string(),
   email: z.string().email(),
-  permissao: z.enum(["DEV", "TEC", "ADM", "USR"]),
+  dev: z.boolean(),
   unidade_id: z.string().min(1, "Unidade é obrigatória"),
+  grupo_id: z.string().optional(),
+  papel: z.enum(["ADM", "TEC", "USR"]).optional(),
 });
 
 const formSchema = z.object({
@@ -58,6 +66,8 @@ export default function FormUsuario({
   const [isPending, startTransition] = useTransition();
   const [unidades, setUnidades] = useState<IUnidade[]>([]);
   const [loadingUnidades, setLoadingUnidades] = useState(true);
+  const [grupos, setGrupos] = useState<GrupoDev[]>([]);
+  const [loadingGrupos, setLoadingGrupos] = useState(true);
 
   const formUsuario = useForm<z.infer<typeof formSchemaUsuario>>({
     resolver: zodResolver(formSchemaUsuario),
@@ -65,8 +75,7 @@ export default function FormUsuario({
       email: user?.email || "",
       login: user?.login || "",
       nome: user?.nome || "",
-      permissao:
-        (user?.permissao as unknown as "DEV" | "TEC" | "ADM" | "USR") ?? "USR",
+      dev: user?.dev ?? false,
       unidade_id: user?.unidade_id || "",
     },
   });
@@ -79,6 +88,7 @@ export default function FormUsuario({
   });
 
   const { data: session, update } = useSession();
+  const isDev = session?.usuario?.dev === true;
 
   // Buscar unidades ao montar o componente
   useEffect(() => {
@@ -98,6 +108,22 @@ export default function FormUsuario({
     }
     carregarUnidades();
   }, [session]);
+
+  // Grupo/papel só é escolhido na criação, e só por DEV (mesma fronteira do
+  // modal Governança DEV — um ADM comum não tem hoje como atribuir grupo a
+  // ninguém, nem na criação nem depois).
+  useEffect(() => {
+    async function carregarGrupos() {
+      if (!isUpdating && isDev) {
+        const response = await listarGruposDev();
+        if (response.ok && response.data) {
+          setGrupos(response.data);
+        }
+      }
+      setLoadingGrupos(false);
+    }
+    carregarGrupos();
+  }, [isUpdating, isDev]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const token = session?.access_token;
@@ -125,7 +151,7 @@ export default function FormUsuario({
     startTransition(async () => {
       if (isUpdating && user?.id) {
         const resp = await usuario.atualizar(user?.id, {
-          permissao: values.permissao as unknown as IPermissao,
+          dev: values.dev,
           unidade_id: values.unidade_id,
         });
 
@@ -138,7 +164,7 @@ export default function FormUsuario({
             ...session,
             usuario: {
               ...session?.usuario,
-              permissao: values.permissao,
+              dev: values.dev,
             },
           });
 
@@ -146,18 +172,37 @@ export default function FormUsuario({
           onSuccess?.();
         }
       } else {
-        const { email, login, nome, permissao, unidade_id } = values;
+        const { email, login, nome, dev, unidade_id, grupo_id, papel } = values;
         const resp = await usuario.criar({
           email,
           login,
           nome,
-          permissao: permissao as unknown as IPermissao,
+          dev,
           unidade_id,
         });
         if (resp.error) {
           toast.error("Algo deu errado", { description: resp.error });
         }
-        if (resp.ok) {
+        if (resp.ok && resp.data) {
+          const novoUsuarioId = (resp.data as IUsuario).id;
+
+          if (grupo_id && novoUsuarioId) {
+            const vinculoResp = await atualizarGrupoUsuarioDev(
+              novoUsuarioId,
+              grupo_id,
+              { ativo: true, permissao_grupo: papel || "USR" },
+            );
+
+            if (!vinculoResp.ok) {
+              toast.error(
+                "Usuário criado, mas não foi possível vincular o grupo",
+                { description: vinculoResp.error || undefined },
+              );
+              onSuccess?.();
+              return;
+            }
+          }
+
           toast.success("Usuário Criado", { description: resp.status });
           onSuccess?.();
         }
@@ -256,23 +301,16 @@ export default function FormUsuario({
           />
           <FormField
             control={formUsuario.control}
-            name="permissao"
+            name="dev"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Permissão</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={"Defina a permissão"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="DEV">Desenvolvedor</SelectItem>
-                    <SelectItem value="TEC">Técnico</SelectItem>
-                    <SelectItem value="ADM">Administrador</SelectItem>
-                    <SelectItem value="USR">Usuário</SelectItem>
-                  </SelectContent>
-                </Select>
+              <FormItem className="flex flex-row items-center justify-between rounded-md border p-3">
+                <FormLabel className="!mt-0">É desenvolvedor?</FormLabel>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -311,6 +349,66 @@ export default function FormUsuario({
               </FormItem>
             )}
           />
+          {!isUpdating && isDev && (
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 rounded-md border p-3">
+              <FormField
+                control={formUsuario.control}
+                name="grupo_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Grupo</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={loadingGrupos}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              loadingGrupos
+                                ? "Carregando..."
+                                : "Sem grupo (opcional)"
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {grupos.map((grupo) => (
+                          <SelectItem key={grupo.id} value={grupo.id}>
+                            {grupo.sigla ? `${grupo.sigla} - ${grupo.nome}` : grupo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={formUsuario.control}
+                name="papel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Papel no grupo</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "USR"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="ADM">ADM</SelectItem>
+                        <SelectItem value="TEC">TEC</SelectItem>
+                        <SelectItem value="USR">USR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
           <div className="flex gap-2 items-center justify-end">
             <DialogClose asChild>
               <Button variant={"outline"}>Voltar</Button>

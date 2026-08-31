@@ -11,13 +11,13 @@ import { mapProcessoToResponseDto } from './map-processo-response';
 export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_id: string) {
   const processoExistente = await buscarPorId(id, usuario_id);
 
-  const usuarioAtual = await prisma.usuario.findUnique({ where: { id: usuario_id }, select: { permissao: true } });
+  const usuarioAtual = await prisma.usuario.findUnique({ where: { id: usuario_id }, select: { dev: true } });
 
   const processoPermissao = await prisma.processo.findUnique({
     where: { id },
     select: {
       usuario_atribuido_id: true,
-      grupos: { where: { ativo: true }, select: { grupo: { select: { id: true } } } },
+      grupo_id: true,
     },
   });
 
@@ -26,14 +26,17 @@ export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_
       ? await usuarioTemPermissaoGrupoNoProcesso(usuario_id, processoPermissao, 'modificar')
       : false;
 
-  // Simplificação decidida pela usuária (2026-08-14): só DEV tem bypass de sistema.
-  if (usuarioAtual && usuarioAtual.permissao !== 'DEV' && !temPermissaoGrupoModificar) {
+  if (usuarioAtual && !usuarioAtual.dev && !temPermissaoGrupoModificar) {
     throw new HttpError(403, 'Você não tem permissão de grupo para editar este processo.');
   }
 
   if (dados.numero_sei && dados.numero_sei !== processoExistente.numero_sei) {
-    const processoComMesmoSei = await prisma.processo.findUnique({ where: { numero_sei: dados.numero_sei } });
-    if (processoComMesmoSei) throw new HttpError(400, 'Já existe outro processo com este número SEI.');
+    // Só bloqueia duplicata dentro do mesmo grupo — o mesmo numero_sei pode
+    // existir em cópias independentes de outros grupos (ver criar.ts).
+    const processoComMesmoSei = await prisma.processo.findFirst({
+      where: { numero_sei: dados.numero_sei, grupo_id: processoExistente.grupo_id },
+    });
+    if (processoComMesmoSei) throw new HttpError(400, 'Já existe outro processo com este número SEI neste grupo.');
   }
 
   let interessadoId: string | null = null;

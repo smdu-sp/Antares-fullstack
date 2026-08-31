@@ -6,12 +6,20 @@ export interface IUnidadeUsuario {
   sigla: string;
 }
 
+export interface IGrupoUsuarioResumo {
+  grupo: {
+    id: string;
+    nome: string;
+    codigo: string;
+  };
+}
+
 export interface IUsuario {
   id: string;
   nome: string;
   login: string;
   email: string;
-  permissao: IPermissao | string;
+  dev: boolean;
   avatar?: string;
   status: boolean;
   ultimoLogin: Date;
@@ -20,13 +28,7 @@ export interface IUsuario {
   nomeSocial?: string;
   unidade_id: string;
   unidade?: IUnidadeUsuario;
-}
-
-export enum IPermissao {
-  DEV,
-  TEC,
-  ADM,
-  USR,
+  grupos?: IGrupoUsuarioResumo[];
 }
 
 export interface ICreateUsuario {
@@ -34,7 +36,7 @@ export interface ICreateUsuario {
   email: string;
   login: string;
   avatar?: string;
-  permissao?: IPermissao | string;
+  dev?: boolean;
   status?: boolean;
   nomeSocial?: string;
   unidade_id: string;
@@ -45,7 +47,7 @@ export interface IUpdateUsuario {
   status?: boolean;
   nomeSocial?: string;
   avatar?: string;
-  permissao?: IPermissao | string;
+  dev?: boolean;
   unidade_id?: string;
 }
 
@@ -88,7 +90,7 @@ export interface IUsuarioSession {
   login: string;
   email: string;
   nomeSocial?: string;
-  permissao: IPermissao | string;
+  dev: boolean;
   status: number;
   avatar?: string;
   iat: number;

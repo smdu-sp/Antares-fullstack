@@ -5,7 +5,7 @@ import type { IGrupoAtivo } from "@/types/grupo-ativo";
 
 type SessionLike = {
   usuario?: {
-    permissao?: string;
+    dev?: boolean;
   };
   grupoAtivo?: IGrupoAtivo;
 };
@@ -15,7 +15,7 @@ type UsuarioLike =
   | IUsuarioSession
   | SessionLike
   | {
-      permissao?: string;
+      dev?: boolean;
     }
   | null
   | undefined;
@@ -47,16 +47,13 @@ export function getPermissaoCoordenadoria(usuario: UsuarioLike): string {
   }
 
   const usuarioDireto = usuario as {
-    permissao?: string;
+    dev?: boolean;
   };
 
-  const permissao =
-    sessao?.usuario?.permissao?.toString() ||
-    usuarioDireto?.permissao?.toString();
-  // Só DEV tem bypass de sistema — qualquer outro papel (inclusive ADM) precisa vir
-  // de um vínculo de grupo real, resolvido acima via getPermissaoCoordenadoriaDoGrupo().
-  if (permissao === "DEV") return "ADMINISTRADOR";
-  if (permissao === "TEC") return "EDITOR";
+  const ehDev = sessao?.usuario?.dev ?? usuarioDireto?.dev;
+  // Só DEV tem bypass de sistema — qualquer outro papel precisa vir de um vínculo
+  // de grupo real, resolvido acima via getPermissaoCoordenadoriaDoGrupo().
+  if (ehDev) return "ADMINISTRADOR";
   return "LEITOR";
 }
 

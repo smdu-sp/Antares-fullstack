@@ -1,10 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { HttpError } from '@/lib/server/http-error';
-import { obterGrupoAtivoIdSimples, usuarioTemVisualizacaoGabinete } from '@/lib/server/shared/grupo-processo';
+import { obterGrupoAtivoIdSimples } from '@/lib/server/shared/grupo-processo';
+import { usuarioPodeNaEntidade } from '@/lib/server/auth/resolver-permissoes';
 
 /**
  * Porte de AndamentosService.usuarioTemPermissaoNoProcesso — só o papel real de grupo.
- * O bypass de DEV é responsabilidade da chamadora, garantirPermissaoProcesso().
+ * O bypass de DEV é responsabilidade da chamadora, garantirPermissaoProcesso(). A
+ * permissão avaliada é sempre "processo.*": andamentos herdam a visibilidade/edição
+ * do processo ao qual pertencem, não têm permissão própria em nível de registro.
  */
 export async function usuarioTemPermissaoNoProcesso(
   usuarioId: string,
@@ -18,39 +21,16 @@ export async function usuarioTemPermissaoNoProcesso(
     where: { id: processoId },
     select: {
       usuario_atribuido_id: true,
-      grupos: { where: { ativo: true }, select: { grupo: { select: { id: true } } } },
+      grupo_id: true,
     },
   });
 
   if (!processo) return false;
-
-  const grupoIds = processo.grupos.map((item) => item.grupo.id);
-  if (grupoIds.length === 0) return false;
-  if (!grupoIds.includes(grupoAtivoId)) return false;
-
-  const permissoes = await prisma.usuarioGrupoPermissao.findMany({
-    where: {
-      ativo: true,
-      usuarioGrupo: { ativo: true, usuario_id: usuarioId, grupo_id: grupoAtivoId, grupo: { ativo: true } },
-    },
-    select: {
-      visualizar_grupo: true,
-      visualizar_proprios: true,
-      modificar_grupo: true,
-      modificar_proprios: true,
-      excluir: true,
-    },
-  });
-
-  if (permissoes.length === 0) return false;
+  if (processo.grupo_id !== grupoAtivoId) return false;
 
   const isProprio = processo.usuario_atribuido_id === usuarioId;
 
-  if (acao === 'excluir') return permissoes.some((item) => item.excluir);
-  if (acao === 'modificar') {
-    return permissoes.some((item) => item.modificar_grupo || (item.modificar_proprios && isProprio));
-  }
-  return permissoes.some((item) => item.visualizar_grupo || (item.visualizar_proprios && isProprio));
+  return usuarioPodeNaEntidade(usuarioId, 'processo', acao, grupoAtivoId, isProprio);
 }
 
 /**
@@ -64,9 +44,8 @@ export async function garantirPermissaoProcesso(
   processoId: string,
   acao: 'visualizar' | 'modificar' | 'excluir',
 ): Promise<void> {
-  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { permissao: true } });
-  if (usuario?.permissao === 'DEV') return;
-  if (await usuarioTemVisualizacaoGabinete(usuarioId)) return;
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { dev: true } });
+  if (usuario?.dev) return;
   if (await usuarioTemPermissaoNoProcesso(usuarioId, processoId, acao)) return;
 
   throw new HttpError(403, 'Você não tem permissão de grupo para acessar este processo.');

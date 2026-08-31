@@ -5,12 +5,12 @@ import { prisma } from '@/lib/prisma';
 export async function sincronizarGrupoLegado(usuarioId: string): Promise<void> {
   const usuario = await prisma.usuario.findUnique({
     where: { id: usuarioId },
-    select: { permissao: true },
+    select: { dev: true },
   });
 
   if (!usuario) return;
 
-  if (usuario.permissao === 'DEV') {
+  if (usuario.dev) {
     await prisma.grupo.upsert({
       where: { codigo_tipo: { codigo: GrupoCodigo.GLOBAL, tipo: GrupoTipo.DIVISAO } },
       create: {

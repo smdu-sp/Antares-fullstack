@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { HttpError } from '@/lib/server/http-error';
 import { criar as criarLog } from '@/lib/server/logs/criar';
 import type { CreateProcessoInput } from '@/lib/server/validation/processos.schema';
-import { vincularProcessoAoGrupoPrincipal } from './vincular-grupo-principal';
+import { obterGrupoAtivoIdSimples } from '@/lib/server/shared/grupo-processo';
 import { mapProcessoToResponseDto } from './map-processo-response';
 
 /** Porte de ProcessosService.criar (Antares-backend/src/processos/processos.service.ts). */
@@ -15,13 +15,24 @@ export async function criar(dados: CreateProcessoInput, usuario_id: string) {
     throw new HttpError(400, 'Owner do processo deve ser o usuario criador.');
   }
 
+  const grupoAtivoId = await obterGrupoAtivoIdSimples(usuario_id);
+  if (!grupoAtivoId) {
+    throw new HttpError(400, 'Usuario criador nao possui grupo ativo para vincular o processo.');
+  }
+
   let numeroSei = dados.numero_sei;
   if (!numeroSei) {
     numeroSei = `DRAFT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  const processoExistente = await prisma.processo.findUnique({ where: { numero_sei: numeroSei } });
-  if (processoExistente) throw new HttpError(400, 'Já existe um processo com este número SEI.');
+  // Vínculo automático por grupo: um numero_sei que já existe em OUTRO grupo não
+  // bloqueia mais — cada grupo tem sua própria cópia independente do processo
+  // (mesmo numero_sei, linha própria; nenhum dado é copiado de um grupo pro
+  // outro). Só bloqueia duplicata dentro do MESMO grupo.
+  const processoExistente = await prisma.processo.findFirst({
+    where: { numero_sei: numeroSei, grupo_id: grupoAtivoId },
+  });
+  if (processoExistente) throw new HttpError(400, 'Já existe um processo com este número SEI neste grupo.');
 
   if (dados.interessado_id) {
     const interessado = await prisma.interessado.findUnique({ where: { id: dados.interessado_id, ativo: true } });
@@ -60,10 +71,9 @@ export async function criar(dados: CreateProcessoInput, usuario_id: string) {
       prorrogacao: dados.data_prorrogacao ? new Date(dados.data_prorrogacao) : undefined,
       usuario_atribuido_id: usuario_id,
       unidade_id: usuario.unidade_id,
+      grupo_id: grupoAtivoId,
     },
   });
-
-  await vincularProcessoAoGrupoPrincipal(processo.id, usuario_id);
 
   await criarLog(
     TipoAcao.PROCESSO_CRIADO,

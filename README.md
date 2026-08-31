@@ -34,9 +34,9 @@ Aplicação **fullstack** em Next.js (App Router) para controle e acompanhamento
 
 ### Segurança e Controle
 - 🔐 **Autenticação LDAP**: Login integrado com Active Directory (`ENVIRONMENT=local` no `.env` pula o bind LDAP, útil em desenvolvimento)
-- 🔑 **Autorização por grupos**: permissão de sistema (`DEV` = acesso total; qualquer outra permissão depende 100% do papel real do usuário dentro do seu grupo ativo) + papel por grupo (ADM/TEC/USR) + capacidades granulares (visualizar/modificar/excluir) por vínculo usuário-grupo
+- 🔑 **Autorização por grupos**: flag de sistema `dev` (`true` = acesso total; para todo o resto, o acesso depende 100% do papel real do usuário dentro do seu grupo ativo) + papel por grupo (ADM/TEC/USR) + capacidades granulares (visualizar/modificar/excluir) por vínculo usuário-grupo
 - 📝 **Sistema de Logs**: Auditoria completa de ações
-- 👥 **Gerenciamento de Usuários e Grupos**: Controle de permissões, unidades e grupos de acesso (tela DEV em `/grupos-acesso`)
+- 👥 **Gerenciamento de Usuários e Grupos**: Controle de permissões, unidades e grupos de acesso (abas DEV dentro de `/usuarios`: Grupos, Vincular Processo, Matriz de Permissões, Permissões por Papel)
 
 ## 🚀 Tecnologias
 
@@ -161,9 +161,9 @@ app/
 │   ├── page.tsx                 # Dashboard com métricas e grid de processos
 │   ├── processos/                # Gestão de processos e andamentos
 │   ├── interessados/             # Cadastro de interessados
-│   ├── usuarios/                 # Gerenciamento de usuários
+│   ├── usuarios/                 # Gerenciamento de usuários + abas DEV (grupos, vínculos
+│   │                               # processo-grupo, matriz de permissões, permissões por papel)
 │   ├── unidades/                 # Cadastro de unidades
-│   ├── grupos-acesso/             # Tela DEV: grupos, vínculos processo-grupo, matriz de permissões
 │   ├── perfil/                   # Perfil e configurações do usuário
 │   └── logs/                     # Logs e auditoria do sistema
 ├── (rotas-livres)/              # Rotas públicas
@@ -192,7 +192,7 @@ lib/
 │   ├── auth.middleware.ts        # Instância NextAuth exclusiva do middleware (Edge Runtime)
 │   └── auth.config.ts            # Config leve Edge-safe (sem Prisma/LDAP)
 ├── server/
-│   ├── auth/                    # requireAuth/requirePermissoes/requireCapacidade (porte dos guards)
+│   ├── auth/                    # requireAuth/requirePermissoes/requirePermissao (porte dos guards)
 │   ├── <dominio>/                # Lógica de negócio por domínio, chamada pelos Route Handlers
 │   └── validation/                # Schemas Zod por domínio
 ├── prisma.ts                    # Singleton do Prisma Client
@@ -213,9 +213,9 @@ prisma/
 
 Três camadas, checadas nessa ordem em cada Route Handler:
 
-1. **Permissão de sistema** (`usuario.permissao`): só `DEV` tem bypass total (acesso a tudo, em qualquer grupo). As demais (`ADM`/`TEC`/`USR`) não têm nenhum privilégio especial de sistema — todo o resto do acesso vem exclusivamente do papel do usuário dentro do seu **grupo ativo**.
+1. **Flag de sistema** (`usuario.dev: boolean`): só `dev = true` tem bypass total (acesso a tudo, em qualquer grupo). Todo o resto do acesso vem exclusivamente do papel do usuário dentro do seu **grupo ativo** — não existe mais um "papel de sistema" ADM/TEC/USR.
 2. **Papel no grupo ativo** (`usuario_grupo.permissao_grupo`: `ADM`/`TEC`/`USR`) — verificado por `requirePermissoes()`.
-3. **Capacidades granulares** por vínculo usuário-grupo (`visualizar_proprios`/`visualizar_grupo`/`modificar_proprios`/`modificar_grupo`/`excluir`) — verificadas por `requireCapacidade()`. O grupo `GABINETE` tem uma regra especial: `visualizar_grupo` dá visibilidade global de processos, não só do próprio grupo.
+3. **Permissões granulares** (tabela `Permissoes`, catálogo extensível — ex.: `processo.visualizar_grupo`, `andamento.excluir`), concedidas a um grupo (`GrupoPermissoes`, baseline) e/ou diretamente a um usuário (`UsuarioPermissoes`, global ou escopada a um grupo) — verificadas por `requirePermissao()`. O grupo `GABINETE` tem uma regra especial: `processo.visualizar_grupo` dá visibilidade global de processos, não só do próprio grupo.
 
 O "grupo ativo" (qual dos grupos do usuário está em uso na sessão) é resolvido em `lib/server/auth/obter-grupo-ativo.ts` e persistido tanto em `preferencias_usuario` (chave `auth.grupo_ativo_id`) quanto no próprio cookie de sessão (via callback `jwt()`), para que o middleware (Edge Runtime, sem acesso a Prisma) consiga tomar decisões de autorização sem nenhuma chamada de rede.
 

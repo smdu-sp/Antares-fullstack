@@ -3,7 +3,7 @@ import { jsonResponse } from '@/lib/http/json-response';
 import { handleRouteError } from '@/lib/http/handle-route-error';
 import { requireAuth } from '@/lib/server/auth/session';
 import { requirePermissoes } from '@/lib/server/auth/permissoes';
-import { requireCapacidade } from '@/lib/server/auth/capacidade';
+import { requirePermissao } from '@/lib/server/auth/permissao';
 import { prorrogar } from '@/lib/server/andamentos/prorrogar';
 
 export const runtime = 'nodejs';
@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC']);
-    await requireCapacidade(usuario.id, 'andamento.modificar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'andamento.modificar', request.headers.get('x-grupo-ativo-id'));
 
     const { id } = await params;
     const body = await request.json();

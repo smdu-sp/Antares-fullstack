@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 async function atualizarHandler(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM', 'TEC']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { id } = await params;
     const body = await request.json();
@@ -52,7 +52,7 @@ export const PUT = atualizarHandler;
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const { id } = await params;
     const resultado = await remover(id);

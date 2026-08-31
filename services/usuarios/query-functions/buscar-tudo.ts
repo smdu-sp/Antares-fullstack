@@ -10,7 +10,7 @@ export async function buscarTudo(
   limite: number = 10,
   busca: string = "",
   status: string = "",
-  permissao: string = "",
+  dev: string = "",
   grupoAtivoId?: string,
 ): Promise<IRespostaUsuario> {
   const baseURL = getInternalApiUrl();
@@ -20,7 +20,7 @@ export async function buscarTudo(
       limite: String(limite),
       busca,
       status,
-      permissao,
+      dev,
     });
 
     const usuarios = await fetch(

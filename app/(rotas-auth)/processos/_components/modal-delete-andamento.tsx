@@ -32,8 +32,11 @@ export default function ModalDeleteAndamento({
   const [open, setOpen] = useState(false);
   const { data: session } = useSession();
 
-  // Verificar se o usuário tem permissão para deletar
-  const canDelete = canAdmin(session?.usuario);
+  // canAdmin precisa da sessão inteira (usa session.grupoAtivo.membroAtivo.permissao
+  // pra refletir o papel real do grupo ativo) — passar só session.usuario faz
+  // cair sempre no fallback de DEV, escondendo o botão pra qualquer ADM real de
+  // grupo que não seja também DEV.
+  const canDelete = canAdmin(session);
 
   // Se não tiver permissão, retornar null (não renderizar o botão)
   if (!canDelete) {

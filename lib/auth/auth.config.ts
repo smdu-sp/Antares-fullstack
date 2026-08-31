@@ -36,7 +36,7 @@ export default {
           const tokenUser = token.user as {
             usuario?: {
               avatar?: string;
-              permissao?: string;
+              dev?: boolean;
               nomeSocial?: string;
             };
             grupoAtivo?: unknown;
@@ -44,7 +44,7 @@ export default {
 
           if (tokenUser.usuario) {
             tokenUser.usuario.avatar = session.usuario.avatar;
-            tokenUser.usuario.permissao = session.usuario.permissao;
+            tokenUser.usuario.dev = session.usuario.dev;
             tokenUser.usuario.nomeSocial = session.usuario.nomeSocial;
           }
           tokenUser.grupoAtivo = session.grupoAtivo;

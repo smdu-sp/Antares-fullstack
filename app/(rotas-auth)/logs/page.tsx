@@ -1,7 +1,6 @@
 /** @format */
 
 import { auth } from "@/lib/auth/auth";
-import { canAdmin } from "@/lib/access-control";
 import { redirect } from "next/navigation";
 import * as log from "@/services/logs";
 import LogsTable from "./_components/logs-table";
@@ -33,16 +32,15 @@ async function LogsPage({
     redirect("/login");
   }
 
-  // Verifica se é admin ou dev
-  const permissao = session.usuario?.permissao;
-  if (!canAdmin(session) && permissao !== "DEV") {
+  // Rota exclusiva de DEV (ver middleware.ts)
+  if (!session.usuario?.dev) {
     redirect("/");
   }
 
   if (!session.grupoAtivo?.id) {
     return (
-      <div className="container mx-auto p-6 space-y-4">
-        <h1 className="text-2xl font-bold">Logs do Sistema</h1>
+      <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
+        <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Logs do Sistema</h1>
         <AccessState
           title="Selecione um grupo ativo para continuar"
           description="Abra o menu do usuário e escolha um grupo ativo antes de acessar logs."
@@ -77,8 +75,8 @@ async function LogsPage({
   if (!response.ok || !response.data) {
     if (response.status === 403) {
       return (
-        <div className="container mx-auto p-6 space-y-4">
-          <h1 className="text-2xl font-bold mb-4">Logs do Sistema</h1>
+        <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
+          <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Logs do Sistema</h1>
           <AccessState
             title="Acesso negado para o grupo ativo"
             description="Seu grupo ativo não possui permissão para consultar logs."
@@ -88,8 +86,8 @@ async function LogsPage({
     }
 
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-4">Logs do Sistema</h1>
+      <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
+        <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Logs do Sistema</h1>
         <p className="text-destructive">
           {response.error || "Erro ao carregar logs"}
         </p>
@@ -105,16 +103,15 @@ async function LogsPage({
   } = response.data;
 
   return (
-    <div className="container mx-auto p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Logs do Sistema</h1>
+    <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
+      <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Logs do Sistema</h1>
+      <div className="flex flex-col max-w-sm mx-auto md:max-w-full gap-3 w-full">
+        <LogsTable logs={data} />
+
+        {total > 0 && (
+          <Pagination total={total} pagina={paginaAtual} limite={limiteAtual} />
+        )}
       </div>
-
-      <LogsTable logs={data} />
-
-      {total > 0 && (
-        <Pagination total={total} pagina={paginaAtual} limite={limiteAtual} />
-      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { jsonResponse } from '@/lib/http/json-response';
 import { handleRouteError } from '@/lib/http/handle-route-error';
 import { requireAuth } from '@/lib/server/auth/session';
-import { requireCapacidade } from '@/lib/server/auth/capacidade';
+import { requirePermissao } from '@/lib/server/auth/permissao';
 import { criarRespostaFinal } from '@/lib/server/processos/criar-resposta-final';
 import { createRespostaFinalSchema } from '@/lib/server/validation/processos.schema';
 
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
     // Rota original não tem @Permissoes, só @RequerCapacidade('processo.modificar').
-    await requireCapacidade(usuario.id, 'processo.modificar', request.headers.get('x-grupo-ativo-id'));
+    await requirePermissao(usuario.id, 'processo.modificar', request.headers.get('x-grupo-ativo-id'));
 
     const body = await request.json();
     const dados = createRespostaFinalSchema.parse(body);

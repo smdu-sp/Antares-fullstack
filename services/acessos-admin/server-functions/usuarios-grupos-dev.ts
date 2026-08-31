@@ -1,4 +1,4 @@
-﻿/** @format */
+/** @format */
 
 "use server";
 
@@ -8,10 +8,19 @@ import { revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
 
+export type Papel = "ADM" | "TEC" | "USR";
+
 export type GrupoDev = {
   id: string;
   nome: string;
   sigla?: string;
+  permissoesBase: Partial<Record<Papel, string[]>>;
+};
+
+export type PermissaoDev = {
+  id: string;
+  codigo: string;
+  descricao: string;
 };
 
 export type GrupoUsuarioDev = {
@@ -20,14 +29,7 @@ export type GrupoUsuarioDev = {
   sigla?: string;
   ativo: boolean;
   permissaoGrupo?: "ADM" | "TEC" | "USR";
-  capacidades?: {
-    visualizar_proprios: boolean;
-    visualizar_grupo: boolean;
-    modificar_proprios: boolean;
-    modificar_grupo: boolean;
-    excluir: boolean;
-    ativo: boolean;
-  };
+  permissoes: string[];
 };
 
 export type AtualizarGrupoUsuarioDevPayload = {
@@ -35,13 +37,8 @@ export type AtualizarGrupoUsuarioDevPayload = {
   permissao_grupo?: "ADM" | "TEC" | "USR";
 };
 
-export type AtualizarPermissoesGrupoUsuarioDevPayload = {
-  visualizar_proprios?: boolean;
-  visualizar_grupo?: boolean;
-  modificar_proprios?: boolean;
-  modificar_grupo?: boolean;
-  excluir?: boolean;
-  ativo?: boolean;
+export type AtualizarPermissoesUsuarioDevPayload = {
+  codigos: string[];
 };
 
 async function extractErrorMessage(
@@ -66,7 +63,36 @@ async function extractErrorMessage(
   return fallback;
 }
 
+function normalizarPermissoesPorGrupoPapel(
+  payload: unknown,
+): Record<string, Partial<Record<Papel, string[]>>> {
+  if (!payload || typeof payload !== "object") return {};
+  const obj = payload as { permissoesPorGrupo?: unknown };
+  if (!obj.permissoesPorGrupo || typeof obj.permissoesPorGrupo !== "object") return {};
+
+  const papeisValidos: Papel[] = ["ADM", "TEC", "USR"];
+
+  return Object.entries(obj.permissoesPorGrupo as Record<string, unknown>).reduce<
+    Record<string, Partial<Record<Papel, string[]>>>
+  >((acc, [grupoId, porPapel]) => {
+    if (!porPapel || typeof porPapel !== "object") return acc;
+
+    const entrada: Partial<Record<Papel, string[]>> = {};
+    for (const papel of papeisValidos) {
+      const codigos = (porPapel as Record<string, unknown>)[papel];
+      if (Array.isArray(codigos)) {
+        entrada[papel] = codigos.filter((c): c is string => typeof c === "string");
+      }
+    }
+
+    acc[grupoId] = entrada;
+    return acc;
+  }, {});
+}
+
 function normalizarGrupos(payload: unknown): GrupoDev[] {
+  const permissoesPorGrupo = normalizarPermissoesPorGrupoPapel(payload);
+
   const source = (() => {
     if (Array.isArray(payload)) return payload;
     if (!payload || typeof payload !== "object") return [];
@@ -116,7 +142,7 @@ function normalizarGrupos(payload: unknown): GrupoDev[] {
       (typeof raw.codigo === "string" && raw.codigo) ||
       undefined;
 
-    acc.push({ id, nome, sigla });
+    acc.push({ id, nome, sigla, permissoesBase: permissoesPorGrupo[id] || {} });
     return acc;
   }, []);
 }
@@ -141,7 +167,31 @@ function extrairLista(payload: unknown): unknown[] {
   return [];
 }
 
+function normalizarPermissoesPorGrupo(payload: unknown): Record<string, string[]> {
+  if (!payload || typeof payload !== "object") return {};
+  const obj = payload as { permissoesPorGrupo?: unknown };
+  if (!obj.permissoesPorGrupo || typeof obj.permissoesPorGrupo !== "object") return {};
+
+  return Object.entries(obj.permissoesPorGrupo as Record<string, unknown>).reduce<
+    Record<string, string[]>
+  >((acc, [grupoId, codigos]) => {
+    if (Array.isArray(codigos)) {
+      acc[grupoId] = codigos.filter((c): c is string => typeof c === "string");
+    }
+    return acc;
+  }, {});
+}
+
+function normalizarPermissoesGlobais(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object") return [];
+  const obj = payload as { permissoesGlobais?: unknown };
+  if (!Array.isArray(obj.permissoesGlobais)) return [];
+  return obj.permissoesGlobais.filter((c): c is string => typeof c === "string");
+}
+
 function normalizarGruposUsuario(payload: unknown): GrupoUsuarioDev[] {
+  const permissoesPorGrupo = normalizarPermissoesPorGrupo(payload);
+
   return extrairLista(payload).reduce<GrupoUsuarioDev[]>((acc, item) => {
     if (!item || typeof item !== "object") return acc;
 
@@ -155,14 +205,6 @@ function normalizarGruposUsuario(payload: unknown): GrupoUsuarioDev[] {
         id?: unknown;
         nome?: unknown;
         sigla?: unknown;
-        ativo?: unknown;
-      };
-      permissao?: {
-        visualizar_proprios?: unknown;
-        visualizar_grupo?: unknown;
-        modificar_proprios?: unknown;
-        modificar_grupo?: unknown;
-        excluir?: unknown;
         ativo?: unknown;
       };
       id?: unknown;
@@ -207,21 +249,30 @@ function normalizarGruposUsuario(payload: unknown): GrupoUsuarioDev[] {
           ? raw.permissaoGrupo
           : undefined;
 
-    const capacidades = raw.permissao
-      ? {
-          visualizar_proprios: Boolean(raw.permissao.visualizar_proprios),
-          visualizar_grupo: Boolean(raw.permissao.visualizar_grupo),
-          modificar_proprios: Boolean(raw.permissao.modificar_proprios),
-          modificar_grupo: Boolean(raw.permissao.modificar_grupo),
-          excluir: Boolean(raw.permissao.excluir),
-          ativo:
-            typeof raw.permissao.ativo === "boolean"
-              ? raw.permissao.ativo
-              : true,
-        }
-      : undefined;
+    acc.push({
+      grupoId,
+      nome,
+      sigla,
+      ativo,
+      permissaoGrupo,
+      permissoes: permissoesPorGrupo[grupoId] || [],
+    });
+    return acc;
+  }, []);
+}
 
-    acc.push({ grupoId, nome, sigla, ativo, permissaoGrupo, capacidades });
+function normalizarPermissoesDev(payload: unknown): PermissaoDev[] {
+  return extrairLista(payload).reduce<PermissaoDev[]>((acc, item) => {
+    if (!item || typeof item !== "object") return acc;
+
+    const raw = item as { id?: unknown; codigo?: unknown; descricao?: unknown };
+    if (typeof raw.id !== "string" || typeof raw.codigo !== "string") return acc;
+
+    acc.push({
+      id: raw.id,
+      codigo: raw.codigo,
+      descricao: typeof raw.descricao === "string" ? raw.descricao : raw.codigo,
+    });
     return acc;
   }, []);
 }
@@ -275,6 +326,7 @@ export async function listarGruposUsuarioDev(usuarioId: string): Promise<{
   ok: boolean;
   error: string | null;
   data: GrupoUsuarioDev[] | null;
+  permissoesGlobais: string[];
   status: number;
 }> {
   const session = await auth();
@@ -299,6 +351,7 @@ export async function listarGruposUsuarioDev(usuarioId: string): Promise<{
         ok: false,
         error: data?.message || "Erro ao buscar grupos do usuário",
         data: null,
+        permissoesGlobais: [],
         status: response.status,
       };
     }
@@ -307,12 +360,59 @@ export async function listarGruposUsuarioDev(usuarioId: string): Promise<{
       ok: true,
       error: null,
       data: normalizarGruposUsuario(data),
+      permissoesGlobais: normalizarPermissoesGlobais(data),
       status: response.status,
     };
   } catch (error) {
     return {
       ok: false,
       error: `Erro ao buscar grupos do usuário: ${error}`,
+      data: null,
+      permissoesGlobais: [],
+      status: 500,
+    };
+  }
+}
+
+export async function listarPermissoesDev(): Promise<{
+  ok: boolean;
+  error: string | null;
+  data: PermissaoDev[] | null;
+  status: number;
+}> {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const baseURL = getInternalApiUrl();
+
+  try {
+    const response = await fetch(`${baseURL}acessos-admin/dev/permissoes`, {
+      method: "GET",
+      headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),
+      cache: "no-store",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: data?.message || "Erro ao buscar permissões",
+        data: null,
+        status: response.status,
+      };
+    }
+
+    return {
+      ok: true,
+      error: null,
+      data: normalizarPermissoesDev(data),
+      status: response.status,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Erro ao buscar permissões: ${error}`,
       data: null,
       status: 500,
     };
@@ -364,7 +464,7 @@ export async function atualizarGrupoUsuarioDev(
 export async function atualizarPermissoesGrupoUsuarioDev(
   usuarioId: string,
   grupoId: string,
-  payload: AtualizarPermissoesGrupoUsuarioDevPayload,
+  payload: AtualizarPermissoesUsuarioDevPayload,
 ): Promise<{ ok: boolean; error: string | null; status: number }> {
   const session = await auth();
   if (!session) redirect("/login");
@@ -396,6 +496,45 @@ export async function atualizarPermissoesGrupoUsuarioDev(
     return {
       ok: false,
       error: `Erro ao atualizar permissões por grupo: ${error}`,
+      status: 500,
+    };
+  }
+}
+
+export async function atualizarPermissoesGlobaisUsuarioDev(
+  usuarioId: string,
+  payload: AtualizarPermissoesUsuarioDevPayload,
+): Promise<{ ok: boolean; error: string | null; status: number }> {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const baseURL = getInternalApiUrl();
+
+  try {
+    const response = await fetch(
+      `${baseURL}acessos-admin/dev/usuarios/${usuarioId}/permissoes`,
+      {
+        method: "PATCH",
+        headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json();
+      return {
+        ok: false,
+        error: data?.message || "Erro ao atualizar permissões globais",
+        status: response.status,
+      };
+    }
+
+    revalidateTag("users");
+    return { ok: true, error: null, status: response.status };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Erro ao atualizar permissões globais: ${error}`,
       status: 500,
     };
   }

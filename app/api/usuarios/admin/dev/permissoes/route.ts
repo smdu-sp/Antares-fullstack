@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     const pagina = Number(searchParams.get('pagina')) || undefined;
     const limite = Number(searchParams.get('limite')) || undefined;
     const busca = searchParams.get('busca') || undefined;
-    const permissao = searchParams.get('permissao') || undefined;
+    const dev = searchParams.get('dev') || undefined;
     const status = searchParams.get('status') || undefined;
 
-    const resultado = await listarPermissoesDev(pagina, limite, busca, permissao, status);
+    const resultado = await listarPermissoesDev(pagina, limite, busca, dev, status);
 
     return jsonResponse(resultado);
   } catch (error) {

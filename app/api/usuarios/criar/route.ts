@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 export async function POST(request: NextRequest) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM']);
+    await requirePermissoes(usuario.id, ['DEV']);
 
     const usuarioLogado = await prisma.usuario.findUnique({ where: { id: usuario.id } });
     if (!usuarioLogado) throw new HttpError(401, 'Usuário não encontrado.');

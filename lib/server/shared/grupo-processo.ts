@@ -19,6 +19,16 @@ export async function obterGrupoAtivoIdSimples(usuarioId: string): Promise<strin
     });
 
     if (vinculoPreferido) return vinculoPreferido.grupo_id;
+
+    // Visão do Gabinete: a preferência pode apontar pra um grupo sem vínculo real,
+    // desde que o usuário seja membro ativo do GABINETE e o grupo exista/esteja ativo.
+    if (await usuarioEhMembroGabinete(usuarioId)) {
+      const grupoPreferido = await prisma.grupo.findFirst({
+        where: { id: preferencia.valor, ativo: true },
+        select: { id: true },
+      });
+      if (grupoPreferido) return grupoPreferido.id;
+    }
   }
 
   const vinculo = await prisma.usuarioGrupo.findFirst({
@@ -31,27 +41,16 @@ export async function obterGrupoAtivoIdSimples(usuarioId: string): Promise<strin
 }
 
 /**
- * Porte de usuarioTemVisualizacaoGabinete (idêntico em ProcessosService e AndamentosService).
+ * Usuário é membro ativo do grupo GABINETE. Base pra "visão do Gabinete": poder
+ * selecionar qualquer grupo ativo no seletor de grupo ativo (um de cada vez, não
+ * todos juntos) e ter ADM honorário nele, escopado a processo/andamento — ver
+ * usuarioTemPermissao() em resolver-permissoes.ts.
  */
-export async function usuarioTemVisualizacaoGabinete(usuarioId?: string): Promise<boolean> {
-  if (!usuarioId) return false;
-
-  const grupoAtivoId = await obterGrupoAtivoIdSimples(usuarioId);
-  if (!grupoAtivoId) return false;
-
-  const permissao = await prisma.usuarioGrupoPermissao.findFirst({
-    where: {
-      ativo: true,
-      visualizar_grupo: true,
-      usuarioGrupo: {
-        ativo: true,
-        usuario_id: usuarioId,
-        grupo_id: grupoAtivoId,
-        grupo: { ativo: true, codigo: GrupoCodigo.GABINETE },
-      },
-    },
+export async function usuarioEhMembroGabinete(usuarioId: string): Promise<boolean> {
+  const vinculo = await prisma.usuarioGrupo.findFirst({
+    where: { usuario_id: usuarioId, ativo: true, grupo: { ativo: true, codigo: GrupoCodigo.GABINETE } },
     select: { id: true },
   });
 
-  return !!permissao;
+  return !!vinculo;
 }

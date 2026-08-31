@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { obterGrupoAtivoIdSimples, usuarioTemVisualizacaoGabinete } from '@/lib/server/shared/grupo-processo';
+import { obterGrupoAtivoIdSimples } from '@/lib/server/shared/grupo-processo';
+import { usuarioTemPermissao } from '@/lib/server/auth/resolver-permissoes';
 
 export interface VisibilidadeAndamentos {
   semAcesso: boolean;
@@ -13,54 +14,36 @@ export async function montarFiltrosVisibilidadeAndamentos(usuarioId?: string): P
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: usuarioId },
-    select: { unidade_id: true, permissao: true },
+    select: { unidade_id: true, dev: true },
   });
 
   if (!usuario) return { semAcesso: true, filtros: [] };
-  // Simplificação decidida pela usuária (2026-08-14): só DEV tem bypass de sistema.
-  if (usuario.permissao === 'DEV') return { semAcesso: false, filtros: [] };
+  if (usuario.dev) return { semAcesso: false, filtros: [] };
 
   const grupoAtivoId = await obterGrupoAtivoIdSimples(usuarioId);
   if (!grupoAtivoId) return { semAcesso: true, filtros: [] };
 
-  if (await usuarioTemVisualizacaoGabinete(usuarioId)) return { semAcesso: false, filtros: [] };
+  // Visibilidade de andamento é herdada do processo ao qual ele pertence (mesma
+  // regra usada em usuarioTemPermissaoNoProcesso) — não existe permissão própria
+  // de "andamento.visualizar_*" em nível de registro, só a coarse gate de rota.
+  const [podeVisualizarGrupo, podeVisualizarProprios] = await Promise.all([
+    usuarioTemPermissao(usuarioId, 'processo.visualizar_grupo', grupoAtivoId),
+    usuarioTemPermissao(usuarioId, 'processo.visualizar_proprios', grupoAtivoId),
+  ]);
 
-  const permissoesGrupo = await prisma.usuarioGrupoPermissao.findMany({
-    where: {
-      ativo: true,
-      OR: [{ visualizar_grupo: true }, { visualizar_proprios: true }],
-      usuarioGrupo: { ativo: true, usuario_id: usuarioId, grupo_id: grupoAtivoId, grupo: { ativo: true } },
-    },
-    select: {
-      visualizar_grupo: true,
-      visualizar_proprios: true,
-      usuarioGrupo: { select: { grupo_id: true } },
-    },
-  });
-
-  if (permissoesGrupo.length === 0) return { semAcesso: true, filtros: [] };
-
-  const gruposComVisualizacao = Array.from(
-    new Set(
-      permissoesGrupo.filter((item) => item.visualizar_grupo).map((item) => item.usuarioGrupo.grupo_id),
-    ),
-  );
-
-  const podeVisualizarProprios = permissoesGrupo.some((item) => item.visualizar_proprios);
+  if (!podeVisualizarGrupo && !podeVisualizarProprios) return { semAcesso: true, filtros: [] };
 
   const filtrosGrupo: Prisma.andamentoWhereInput[] = [];
 
-  if (gruposComVisualizacao.length > 0) {
-    filtrosGrupo.push({
-      processo: { grupos: { some: { ativo: true, grupo_id: { in: gruposComVisualizacao } } } },
-    });
+  if (podeVisualizarGrupo) {
+    filtrosGrupo.push({ processo: { grupo_id: grupoAtivoId } });
   }
 
   if (podeVisualizarProprios) {
     filtrosGrupo.push({
       AND: [
         { processo: { usuario_atribuido_id: usuarioId } },
-        { processo: { grupos: { some: { ativo: true, grupo_id: grupoAtivoId } } } },
+        { processo: { grupo_id: grupoAtivoId } },
       ],
     });
   }
