@@ -16,11 +16,9 @@ const COLUNAS_PADRAO_EXPEDIENTE = [
   'assunto',
   'origem',
   'interessado',
-  'unidadeDestino',
   'data_recebimento',
   'data_envio_unidade',
   'prazo',
-  'data_prorrogacao',
   'data_resposta_final',
   'resposta_final',
 ];
