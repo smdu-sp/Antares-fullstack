@@ -68,6 +68,11 @@ export default function FormUsuario({
   const [loadingUnidades, setLoadingUnidades] = useState(true);
   const [grupos, setGrupos] = useState<GrupoDev[]>([]);
   const [loadingGrupos, setLoadingGrupos] = useState(true);
+  // Cadastro fora do LDAP (ex.: o usuário local do .env — ver
+  // USUARIO_LOCAL_LOGIN em validate-credentials.ts): sem isso, login/nome/
+  // email só preenchem via busca no LDAP, e ficam travados em disabled pra
+  // sempre se o login não existir lá.
+  const [preenchimentoManual, setPreenchimentoManual] = useState(false);
 
   const formUsuario = useForm<z.infer<typeof formSchemaUsuario>>({
     resolver: zodResolver(formSchemaUsuario),
@@ -212,7 +217,7 @@ export default function FormUsuario({
 
   return (
     <>
-      {!isUpdating && (
+      {!isUpdating && !preenchimentoManual && (
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
@@ -250,6 +255,18 @@ export default function FormUsuario({
         </Form>
       )}
 
+      {!isUpdating && isDev && (
+        <button
+          type="button"
+          onClick={() => setPreenchimentoManual((atual) => !atual)}
+          className="text-xs text-muted-foreground underline underline-offset-2 mb-3 block"
+        >
+          {preenchimentoManual
+            ? "Voltar a buscar pelo LDAP"
+            : "Usuário não está no LDAP? Preencher login/nome/e-mail manualmente"}
+        </button>
+      )}
+
       <Form {...formUsuario}>
         <form
           onSubmit={formUsuario.handleSubmit(onSubmitUser)}
@@ -262,7 +279,11 @@ export default function FormUsuario({
               <FormItem>
                 <FormLabel>Login de rede</FormLabel>
                 <FormControl>
-                  <Input disabled placeholder="Login do usuário" {...field} />
+                  <Input
+                    disabled={isUpdating || !preenchimentoManual}
+                    placeholder="Login do usuário"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -275,7 +296,11 @@ export default function FormUsuario({
               <FormItem>
                 <FormLabel>Nome</FormLabel>
                 <FormControl>
-                  <Input disabled placeholder="Nome do usuário" {...field} />
+                  <Input
+                    disabled={isUpdating || !preenchimentoManual}
+                    placeholder="Nome do usuário"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -289,7 +314,7 @@ export default function FormUsuario({
                 <FormLabel>E-mail</FormLabel>
                 <FormControl>
                   <Input
-                    disabled
+                    disabled={isUpdating || !preenchimentoManual}
                     type="email"
                     placeholder="E-mail do usuário"
                     {...field}
