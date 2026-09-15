@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE `processos` ADD COLUMN `origem` VARCHAR(191) NOT NULL DEFAULT 'EXPEDIENTE';
