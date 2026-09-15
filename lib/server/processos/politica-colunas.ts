@@ -16,7 +16,6 @@ const COLUNAS_PADRAO_EXPEDIENTE = [
   'assunto',
   'origem',
   'interessado',
-  'unidadeRemetente',
   'unidadeDestino',
   'data_recebimento',
   'data_envio_unidade',
