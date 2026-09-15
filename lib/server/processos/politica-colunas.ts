@@ -5,35 +5,48 @@ import { obterGrupoAtivoIdSimples, usuarioEhMembroGabinete } from '@/lib/server/
 
 const CHAVE_ORDEM_COLUNAS_PROCESSOS = 'grid.processos.colunas.ordem';
 const COLUNAS_FIXAS_PROCESSOS = ['selecao', 'expansao'];
+// Os colIds abaixo têm que ser exatamente os mesmos `field`s usados nos
+// ColDef da grid (ver colunasRenderizadas em components/processos-spreadsheet.tsx)
+// — o filtro de colunas visíveis compara string a string, então qualquer
+// divergência aqui faz a coluna correspondente sumir silenciosamente da grid,
+// mesmo que o dado exista. Ver normalizarCampoColuna em app/(rotas-auth)/page.tsx
+// pra compatibilidade com colIds antigos já salvos como preferência de usuário.
 const COLUNAS_PADRAO_EXPEDIENTE = [
   'numero_sei',
   'assunto',
   'origem',
   'interessado',
-  'unidade_remetente',
-  'unidade_destino',
+  'unidadeRemetente',
+  'unidadeDestino',
   'data_recebimento',
   'data_envio_unidade',
   'prazo',
-  'prorrogacao',
+  'data_prorrogacao',
   'data_resposta_final',
-  'observacoes',
+  'resposta_final',
 ];
-const COLUNAS_PADRAO_SERVIN = ['numero_sei', 'assunto', 'origem', 'responsavel', 'prazo', 'observacoes'];
+const COLUNAS_PADRAO_SERVIN = [
+  'numero_sei',
+  'assunto',
+  'origem',
+  'usuario_atribuido_nome',
+  'prazo',
+  'resposta_final',
+];
 const COLUNAS_PADRAO_GABINETE = [
   'numero_sei',
   'assunto',
   'origem',
   'interessado',
-  'unidade_remetente',
-  'unidade_destino',
-  'responsavel',
+  'unidadeRemetente',
+  'unidadeDestino',
+  'usuario_atribuido_nome',
   'data_recebimento',
   'data_envio_unidade',
   'prazo',
-  'prorrogacao',
+  'data_prorrogacao',
   'data_resposta_final',
-  'observacoes',
+  'resposta_final',
 ];
 
 function obterColunasPadraoPorGrupo(codigoGrupo: GrupoCodigo): string[] {

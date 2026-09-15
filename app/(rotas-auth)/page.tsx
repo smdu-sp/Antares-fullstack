@@ -26,6 +26,13 @@ function normalizarCampoColuna(coluna: string): string {
   if (coluna === "responsavel") return "usuario_atribuido_nome";
   if (coluna === "responsável") return "usuario_atribuido_nome";
   if (coluna === "responsavel_processo") return "usuario_atribuido_nome";
+  // colIds antigos (não batiam com os field das colunas na grid — ver
+  // lib/server/processos/politica-colunas.ts) preservados aqui só pra não
+  // perder a ordem de quem já tinha personalizado colunas antes da correção.
+  if (coluna === "unidade_remetente") return "unidadeRemetente";
+  if (coluna === "unidade_destino") return "unidadeDestino";
+  if (coluna === "prorrogacao") return "data_prorrogacao";
+  if (coluna === "observacoes") return "resposta_final";
   return coluna;
 }
 
