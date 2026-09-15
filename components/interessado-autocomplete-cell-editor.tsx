@@ -6,18 +6,54 @@ import { IInteressado } from "@/types/interessado";
 import { ICellEditorComp } from "ag-grid-community";
 import { criar as criarInteressado } from "@/services/interessados/server-functions/criar";
 import { toast } from "sonner";
+// Cores da lista de sugestões (fixed, anexada ao body — escapa do tema/CSS
+// vars do AG-Grid, então não segue o modo escuro sozinha; sem isso a lista
+// ficava sempre branca com texto claro por cima, ilegível no modo escuro).
+// Checado uma vez na criação: a classe "dark" é aplicada no <html> pelo
+// next-themes (attribute="class"), inclusive quando o tema é "system".
+const CORES_LISTA = {
+  light: {
+    bg: "#ffffff",
+    border: "1px solid #ccc",
+    borderItem: "1px solid #eee",
+    texto: "#111827",
+    textoMuted: "#666",
+    textoPlaceholder: "#999",
+    hover: "#f0f9ff",
+    criarBg: "#f9fafb",
+  },
+  dark: {
+    bg: "#262626",
+    border: "1px solid #404040",
+    borderItem: "1px solid #3f3f46",
+    texto: "#e5e7eb",
+    textoMuted: "#a3a3a3",
+    textoPlaceholder: "#71717a",
+    hover: "#374151",
+    criarBg: "#1f2937",
+  },
+};
+
+function corAtual() {
+  return document.documentElement.classList.contains("dark")
+    ? CORES_LISTA.dark
+    : CORES_LISTA.light;
+}
+
 class InteressadoAutocompleteCellEditor implements ICellEditorComp {
   private eGui!: HTMLDivElement;
   private input!: HTMLInputElement;
   private listContainer!: HTMLDivElement;
   private interessados: IInteressado[] = [];
   private params: any;
+  private cores = corAtual();
 
   init(params: any) {
     this.params = params;
     // Buscar dados do context do AG-Grid em vez de params diretos
     this.interessados =
       params.context?.interessados || params.interessados || [];
+    this.cores = corAtual();
 
     this.eGui = document.createElement("div");
     this.eGui.style.position = "relative";
@@ -39,15 +75,15 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
     // Lista de sugestões - adicionar ao body para escapar do overflow da célula
     this.listContainer = document.createElement("div");
     this.listContainer.style.position = "fixed";
-    this.listContainer.style.backgroundColor = "white";
-    this.listContainer.style.border = "1px solid #ccc";
+    this.listContainer.style.border = this.cores.border;
     this.listContainer.style.maxHeight = "250px";
     this.listContainer.style.overflowY = "auto";
     this.listContainer.style.zIndex = "10000";
     this.listContainer.style.display = "none";
-    this.listContainer.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+    this.listContainer.style.boxShadow = "0 4px 6px rgba(0,0,0,0.25)";
     this.listContainer.style.minWidth = "200px";
-    this.listContainer.style.backgroundColor = "#ffffff";
+    this.listContainer.style.backgroundColor = this.cores.bg;
+    this.listContainer.style.color = this.cores.texto;
     this.listContainer.style.borderRadius = "4px";
     // Adicionar um data attribute para identificar e limpar depois
     this.listContainer.setAttribute("data-interessado-list", "true");
@@ -124,13 +160,13 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
         item.textContent = interessado.valor.toUpperCase();
         item.style.padding = "10px";
         item.style.cursor = "pointer";
-        item.style.borderBottom = "1px solid #eee";
+        item.style.borderBottom = this.cores.borderItem;
         item.style.transition = "background-color 0.2s";
         item.style.fontSize = "14px";
 
         if (index === 0) {
           item.setAttribute("data-selected", "true");
-          item.style.backgroundColor = "#f0f9ff";
+          item.style.backgroundColor = this.cores.hover;
         }
 
         item.addEventListener("mouseover", () => {
@@ -143,7 +179,7 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
             });
           // Add ao atual
           item.setAttribute("data-selected", "true");
-          item.style.backgroundColor = "#f0f9ff";
+          item.style.backgroundColor = this.cores.hover;
         });
 
         item.addEventListener("mousedown", (e) => {
@@ -161,17 +197,17 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
       item.textContent = `Criar: "${value}"`;
       item.style.padding = "10px";
       item.style.cursor = "pointer";
-      item.style.color = "#666";
+      item.style.color = this.cores.textoMuted;
       item.style.fontStyle = "italic";
-      item.style.backgroundColor = "#f9fafb";
+      item.style.backgroundColor = this.cores.criarBg;
       item.setAttribute("data-selected", "true");
 
       item.addEventListener("mouseover", () => {
-        item.style.backgroundColor = "#f0f9ff";
+        item.style.backgroundColor = this.cores.hover;
       });
 
       item.addEventListener("mouseout", () => {
-        item.style.backgroundColor = "#f9fafb";
+        item.style.backgroundColor = this.cores.criarBg;
       });
 
       item.addEventListener("mousedown", (e) => {
@@ -187,7 +223,7 @@ class InteressadoAutocompleteCellEditor implements ICellEditorComp {
       const item = document.createElement("div");
       item.textContent = "Selecione um interessado";
       item.style.padding = "10px";
-      item.style.color = "#999";
+      item.style.color = this.cores.textoPlaceholder;
       item.style.fontStyle = "italic";
 
       this.listContainer.appendChild(item);

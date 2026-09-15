@@ -20,7 +20,19 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-export default function ModalDeleteProcesso({ id }: { id: string }) {
+export default function ModalDeleteProcesso({
+  id,
+  onCancelarNovo,
+}: {
+  id: string;
+  /** Presente quando o processo `id` é uma linha nova ainda não salva
+   * (`_isNew`, id temporário): nada existe no servidor pra deletar, então o
+   * botão só descarta a linha local (sem diálogo de confirmação, sem chamada
+   * de API). Disponível pra quem pode criar processo, mesmo sem permissão de
+   * exclusão — cancelar um rascunho vazio não é a mesma coisa que excluir um
+   * processo salvo. */
+  onCancelarNovo?: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const { data: session } = useSession();
@@ -30,6 +42,23 @@ export default function ModalDeleteProcesso({ id }: { id: string }) {
   // cair sempre no fallback de DEV, escondendo o botão pra qualquer ADM real de
   // grupo que não seja também DEV.
   const canDelete = canAdmin(session);
+
+  if (onCancelarNovo) {
+    return (
+      <Button
+        size={"icon"}
+        variant={"outline"}
+        onClick={onCancelarNovo}
+        title="Cancelar criação"
+        className="hover:bg-destructive cursor-pointer hover:text-white group transition-all ease-linear duration-200"
+      >
+        <Trash2
+          size={24}
+          className="text-destructive dark:text-white group-hover:text-white group"
+        />
+      </Button>
+    );
+  }
 
   // Se não tiver permissão, retornar null (não renderizar o botão)
   if (!canDelete) {

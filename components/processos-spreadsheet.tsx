@@ -757,6 +757,7 @@ function AndamentosDetail({
         editable: false,
         cellRenderer: (params: ICellRendererParams) => {
           const andamentoData = params.data as IAndamento;
+          const ehNovo = (andamentoData as any)._isNew === true;
 
           const handleSuccess = () => {
             const updatedAndamentos = andamentos.filter(
@@ -767,10 +768,13 @@ function AndamentosDetail({
 
           return (
             <div className="flex items-center justify-center h-full gap-1">
-              <ExportAndamentoButton andamentoId={andamentoData.id} />
+              {!ehNovo && (
+                <ExportAndamentoButton andamentoId={andamentoData.id} />
+              )}
               <ModalDeleteAndamento
                 andamento={andamentoData}
                 onSuccess={handleSuccess}
+                onCancelarNovo={ehNovo ? handleSuccess : undefined}
               />
             </div>
           );
@@ -970,17 +974,23 @@ function AndamentosDetail({
       </div>
 
       <div
-        className={`ag-theme-alpine w-full ${
+        className={`${
           theme === "dark" || (theme === "system" && systemTheme === "dark")
-            ? "dark"
-            : ""
-        }`}
+            ? "ag-theme-alpine-dark dark"
+            : "ag-theme-alpine"
+        } w-full`}
         style={
           {
             height: `${gridHeight}px`,
             width: "100%",
             overflowX: "auto",
             overflowY: "auto",
+            // Estas variáveis só ajustam a paleta de células/header por cima da
+            // classe base (ag-theme-alpine-dark, aplicada acima) — é a classe
+            // que garante o resto (popups, menus, dropdown de agSelectCellEditor
+            // etc.) com contraste correto; antes disso o dropdown do editor de
+            // seleção ficava claro com texto claro (herdava o tema claro), já
+            // que só essas ~9 variáveis eram sobrescritas, nunca a classe.
             ...(theme === "dark" ||
             (theme === "system" && systemTheme === "dark")
               ? {
@@ -1859,11 +1869,24 @@ export default function ProcessosSpreadsheet({
             if (params.data?._isDetail) return null;
 
             const processo = params.data as IProcesso;
+            const ehNovo = (processo as any)._isNew === true;
+
+            // Forma funcional pra não depender de `processosLocal` no fechamento
+            // — columnDefs é memoizado com deps vazias de propósito (ver
+            // comentário logo abaixo deste useMemo).
+            const cancelarNovo = () => {
+              setProcessosLocal((atual) =>
+                atual.filter((p) => p.id !== processo.id),
+              );
+            };
 
             return (
               <div className="flex items-center justify-center h-full gap-1">
-                <ExportProcessoButton processoId={processo.id} />
-                <ModalDeleteProcesso id={processo.id} />
+                {!ehNovo && <ExportProcessoButton processoId={processo.id} />}
+                <ModalDeleteProcesso
+                  id={processo.id}
+                  onCancelarNovo={ehNovo ? cancelarNovo : undefined}
+                />
               </div>
             );
           },
@@ -2521,17 +2544,24 @@ export default function ProcessosSpreadsheet({
         }}
       >
         <div
-          className={`ag-theme-alpine w-full ${
+          className={`${
             theme === "dark" || (theme === "system" && systemTheme === "dark")
-              ? "dark"
-              : ""
-          }`}
+              ? "ag-theme-alpine-dark dark"
+              : "ag-theme-alpine"
+          } w-full`}
           style={
             {
               height: "600px",
               width: "100%",
               overflowX: "auto",
               overflowY: "auto",
+              // Estas variáveis só ajustam a paleta de células/header por cima da
+              // classe base (ag-theme-alpine-dark, aplicada acima) — é a classe
+              // que garante o resto (popups, menus, dropdown de agSelectCellEditor
+              // etc.) com contraste correto; antes disso o dropdown do editor de
+              // seleção (ex.: coluna Responsável) ficava claro com texto claro
+              // (herdava o tema claro), já que só essas ~9 variáveis eram
+              // sobrescritas, nunca a classe.
               ...(theme === "dark" ||
               (theme === "system" && systemTheme === "dark")
                 ? {
@@ -2584,7 +2614,10 @@ export default function ProcessosSpreadsheet({
             fullWidthCellRenderer={fullWidthCellRenderer}
             getRowHeight={getRowHeight}
             getRowStyle={getRowStyle}
-            suppressCellFocus={true}
+            // suppressCellFocus removido: ele desliga o rastreio de "célula com
+            // foco" do AG-Grid inteiro (não só das linhas full-width), e é
+            // exatamente disso que a navegação por Tab entre colunas depende —
+            // com ele ligado, Tab nunca sabia pra qual célula ir a seguir.
             overlayNoRowsTemplate="Nenhum processo cadastrado"
           />
         </div>

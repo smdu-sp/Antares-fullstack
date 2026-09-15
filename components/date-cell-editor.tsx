@@ -21,6 +21,39 @@ function removerCalendariosOrfaos() {
     .forEach((el) => el.parentElement?.removeChild(el));
 }
 
+// Cores do popup do calendário (fixed, anexado ao body — escapa do tema/CSS
+// vars do AG-Grid, então não segue o modo escuro sozinho; sem isso o
+// calendário ficava sempre branco com texto escuro por cima, mas invisível
+// contra o resto da UI escura ao redor). Checado uma vez na abertura: a
+// classe "dark" é aplicada no <html> pelo next-themes (attribute="class"),
+// inclusive quando o tema é "system".
+const CORES_CALENDARIO = {
+  light: {
+    bg: "#ffffff",
+    border: "1px solid #ccc",
+    texto: "#111827",
+    textoMuted: "#666",
+    textoDesabilitado: "#ccc",
+    dateBtnBg: "white",
+    dateBtnBorder: "1px solid #ddd",
+  },
+  dark: {
+    bg: "#262626",
+    border: "1px solid #404040",
+    texto: "#e5e7eb",
+    textoMuted: "#a3a3a3",
+    textoDesabilitado: "#525252",
+    dateBtnBg: "#1a1a1a",
+    dateBtnBorder: "1px solid #404040",
+  },
+};
+
+function corAtualCalendario() {
+  return document.documentElement.classList.contains("dark")
+    ? CORES_CALENDARIO.dark
+    : CORES_CALENDARIO.light;
+}
+
 export default class DateCellEditor implements ICellEditorComp {
   value: Date | null = null;
   params!: ICellEditorParams;
@@ -30,12 +63,14 @@ export default class DateCellEditor implements ICellEditorComp {
   calendarOpen = false;
   calendarContainer!: HTMLElement;
   closeListener: ((event: MouseEvent) => void) | null = null;
+  cores = corAtualCalendario();
 
   init(params: ICellEditorParams): void {
     // Uma sessão de edição nova começando é a melhor oportunidade de limpar
     // qualquer calendário órfão de uma sessão anterior mal encerrada.
     removerCalendariosOrfaos();
     this.params = params;
+    this.cores = corAtualCalendario();
     this.value = params.value || null;
     // Converter data inicial para formato DD/MM/YYYY
     if (this.value instanceof Date) {
@@ -119,7 +154,7 @@ export default class DateCellEditor implements ICellEditorComp {
       dayEl.style.textAlign = "center";
       dayEl.style.fontSize = "12px";
       dayEl.style.fontWeight = "bold";
-      dayEl.style.color = "#666";
+      dayEl.style.color = this.cores.textoMuted;
       weekDaysDiv.appendChild(dayEl);
     }
 
@@ -145,10 +180,11 @@ export default class DateCellEditor implements ICellEditorComp {
       dateBtn.type = "button";
       dateBtn.textContent = String(d.getDate());
       dateBtn.style.padding = "6px";
-      dateBtn.style.border = "1px solid #ddd";
+      dateBtn.style.border = this.cores.dateBtnBorder;
       dateBtn.style.borderRadius = "4px";
       dateBtn.style.cursor = "pointer";
-      dateBtn.style.background = "white";
+      dateBtn.style.background = this.cores.dateBtnBg;
+      dateBtn.style.color = this.cores.texto;
       dateBtn.style.fontSize = "12px";
       dateBtn.style.pointerEvents = "auto";
 
@@ -159,7 +195,7 @@ export default class DateCellEditor implements ICellEditorComp {
         selectedDate && d.toDateString() === selectedDate.toDateString();
 
       if (!isCurrentMonth) {
-        dateBtn.style.color = "#ccc";
+        dateBtn.style.color = this.cores.textoDesabilitado;
         dateBtn.disabled = true;
       }
 
@@ -283,8 +319,9 @@ export default class DateCellEditor implements ICellEditorComp {
     this.calendarContainer.style.position = "fixed";
     this.calendarContainer.style.zIndex = "99999";
     this.calendarContainer.style.display = "none";
-    this.calendarContainer.style.background = "white";
-    this.calendarContainer.style.border = "1px solid #ccc";
+    this.calendarContainer.style.background = this.cores.bg;
+    this.calendarContainer.style.color = this.cores.texto;
+    this.calendarContainer.style.border = this.cores.border;
     this.calendarContainer.style.borderRadius = "8px";
     this.calendarContainer.style.padding = "12px";
     this.calendarContainer.style.boxShadow = "0 4px 12px rgba(0,0,0,0.25)";
