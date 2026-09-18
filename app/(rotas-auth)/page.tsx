@@ -4,7 +4,10 @@ import { Filtros } from "@/components/filtros";
 import Pagination from "@/components/pagination";
 import { auth } from "@/lib/auth/auth";
 import * as processo from "@/services/processos";
-import * as unidade from "@/services/unidades";
+// A grid de processos (Origem/Remetente/Destino) usa UnidadeGrupo, por
+// grupo — não o catálogo global (@/services/unidades, usado só no cadastro
+// de usuário).
+import * as unidadeGrupo from "@/services/unidades-grupo";
 import {
   IPaginadoProcesso,
   IProcesso,
@@ -214,8 +217,9 @@ async function Home({
         }
       }
 
-      const unidadesResponse = await unidade.listaCompleta(
+      const unidadesResponse = await unidadeGrupo.listaCompleta(
         session.access_token,
+        grupoAtivoId,
       );
 
       if (unidadesResponse.ok && unidadesResponse.data) {

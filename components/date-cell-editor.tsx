@@ -63,6 +63,7 @@ export default class DateCellEditor implements ICellEditorComp {
   calendarOpen = false;
   calendarContainer!: HTMLElement;
   closeListener: ((event: MouseEvent) => void) | null = null;
+  scrollListener: (() => void) | null = null;
   cores = corAtualCalendario();
 
   init(params: ICellEditorParams): void {
@@ -221,8 +222,7 @@ export default class DateCellEditor implements ICellEditorComp {
           this.textValue = `${day}/${mon}/${yr}`;
           this.input.value = this.textValue;
           this.value = d;
-          this.calendarOpen = false;
-          this.calendarContainer.style.display = "none";
+          this.fecharCalendario();
           // Salvar automaticamente
           this.params.stopEditing();
         }
@@ -306,8 +306,7 @@ export default class DateCellEditor implements ICellEditorComp {
         }
       } else if (e.key === "Escape") {
         if (this.calendarOpen) {
-          this.calendarOpen = false;
-          this.calendarContainer.style.display = "none";
+          this.fecharCalendario();
         } else {
           this.params.stopEditing(true); // cancelar
         }
@@ -355,11 +354,8 @@ export default class DateCellEditor implements ICellEditorComp {
       e.stopPropagation();
       this.calendarOpen = !this.calendarOpen;
       if (this.calendarOpen) {
-        // Calcular posição relativa à viewport
-        const rect = calendarBtn.getBoundingClientRect();
+        this.posicionarCalendario(calendarBtn);
         this.calendarContainer.style.display = "block";
-        this.calendarContainer.style.top = rect.bottom + 4 + "px";
-        this.calendarContainer.style.left = rect.left + "px";
 
         // Adicionar no body para evitar overflow hidden do AG-Grid
         if (!this.calendarContainer.parentElement) {
@@ -382,15 +378,7 @@ export default class DateCellEditor implements ICellEditorComp {
           const isClickOnInput = this.input && this.input.contains(target);
 
           if (!isClickInsideCalendar && !isClickOnButton && !isClickOnInput) {
-            // Clique foi fora - fechar calendário
-            this.calendarOpen = false;
-            this.calendarContainer.style.display = "none";
-            document.removeEventListener(
-              "mousedown",
-              this.closeListener!,
-              true,
-            );
-            this.closeListener = null;
+            this.fecharCalendario();
           }
         };
 
@@ -399,12 +387,20 @@ export default class DateCellEditor implements ICellEditorComp {
         // stopPropagation() durante o bubbling — era essa a causa mais provável
         // do calendário "travar" sem fechar ao clicar fora.
         document.addEventListener("mousedown", this.closeListener, true);
-      } else {
-        this.calendarContainer.style.display = "none";
-        if (this.closeListener) {
-          document.removeEventListener("mousedown", this.closeListener, true);
-          this.closeListener = null;
+
+        // Reposiciona ao rolar (grid, wrapper da grid, ou a página) — o
+        // popup é `position: fixed` no body, calculado uma vez pela posição
+        // do botão; sem isso, ao rolar, o botão/campo se move mas o popup
+        // fica parado na tela, dando a impressão de que ele "sobe e desce"
+        // sozinho, descolado do campo. Fase de captura pelo mesmo motivo do
+        // closeListener acima: scroll não borbulha, só é visto assim.
+        if (this.scrollListener) {
+          document.removeEventListener("scroll", this.scrollListener, true);
         }
+        this.scrollListener = () => this.posicionarCalendario(calendarBtn);
+        document.addEventListener("scroll", this.scrollListener, true);
+      } else {
+        this.fecharCalendario();
       }
     });
 
@@ -422,6 +418,26 @@ export default class DateCellEditor implements ICellEditorComp {
     // NÃO adicionar o calendário no container, ele será adicionado no body quando abrir
 
     return this.container;
+  }
+
+  /** Recalcula a posição do popup a partir da posição atual do botão na tela. */
+  private posicionarCalendario(calendarBtn: HTMLElement) {
+    const rect = calendarBtn.getBoundingClientRect();
+    this.calendarContainer.style.top = rect.bottom + 4 + "px";
+    this.calendarContainer.style.left = rect.left + "px";
+  }
+
+  private fecharCalendario() {
+    this.calendarOpen = false;
+    this.calendarContainer.style.display = "none";
+    if (this.closeListener) {
+      document.removeEventListener("mousedown", this.closeListener, true);
+      this.closeListener = null;
+    }
+    if (this.scrollListener) {
+      document.removeEventListener("scroll", this.scrollListener, true);
+      this.scrollListener = null;
+    }
   }
 
   getValue(): any {
@@ -460,6 +476,10 @@ export default class DateCellEditor implements ICellEditorComp {
     if (this.closeListener) {
       document.removeEventListener("mousedown", this.closeListener, true);
       this.closeListener = null;
+    }
+    if (this.scrollListener) {
+      document.removeEventListener("scroll", this.scrollListener, true);
+      this.scrollListener = null;
     }
 
     // Remover calendário do DOM se ainda estiver lá

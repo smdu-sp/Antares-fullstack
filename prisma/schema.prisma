@@ -8,14 +8,32 @@ model OrigemProcesso {
 }
 
 // Model: Interessado | Tabela: interessados | Descrição: Armazena valores únicos de interessados digitados nos processos para autocomplete
+// Único POR GRUPO (ver @@unique abaixo) — cada grupo tem seu próprio cadastro
+// independente; o mesmo nome pode existir em grupos diferentes como linhas
+// separadas (mesmo princípio de processo.grupo_id).
 model Interessado {
   id     String  @id @default(uuid()) // ID único
-  valor  String  @db.VarChar(768) @unique // Nome do interessado digitado (texto livre, único) — 768 é o máximo para índice único com utf8mb4
+  valor  String  @db.VarChar(768) // Nome do interessado digitado (texto livre) — 768 é o máximo pro tamanho da coluna com utf8mb4
+  // Hash SHA-256 de `valor` (hex, 64 chars), mantido pela aplicação (ver
+  // lib/server/interessados/criar.ts e atualizar.ts) a cada escrita — é ele
+  // que carrega a unicidade por grupo, não `valor` direto. Motivo: um índice
+  // único (valor, grupo_id) nos 768 chars inteiros de `valor` estoura o
+  // limite de 3072 bytes de chave do InnoDB com utf8mb4 (768*4 já usa o
+  // limite sozinho); e um prefixo mais curto (ex.: 191 chars, o padrão do
+  // Prisma) não é seguro aqui — o dado real de produção já tem 90+ pares de
+  // interessados genuinamente diferentes que só divergem depois do char 191
+  // (nomes de órgãos concatenados, textos longos colados no campo). O hash
+  // cobre a string inteira sem esse risco.
+  valorHash String @map("valor_hash") @db.Char(64)
   ativo  Boolean @default(true) // Indica se o interessado está ativo (true) ou foi excluído logicamente (false) - Boolean - Valor padrão: true
   criadoEm DateTime @default(now()) // Data/hora de criação
+  grupo_id String // Grupo dono deste cadastro - String (UUID) - Obrigatório
+  grupo    Grupo   @relation(fields: [grupo_id], references: [id]) // Grupo dono deste cadastro
 
   processos processo[] // Lista de processos relacionados a este interessado
 
+  @@unique([valorHash, grupo_id])
+  @@index([grupo_id])
   @@map("interessados")
 }
 generator client {
@@ -71,7 +89,10 @@ enum TipoAcao {
   PROCESSO_GRUPO_ATUALIZADO // Vínculo de processo x grupo atualizado por painel DEV
 }
 
-// Model: Unidade | Tabela: unidades | Descrição: Armazena informações das unidades organizacionais do sistema
+// Model: Unidade | Tabela: unidades | Descrição: Catálogo GLOBAL de unidades organizacionais — usado só pra unidade
+// do cadastro de usuário (Usuario.unidade_id) e pro eco automático em processo.unidade_id (unidade de quem
+// cadastrou o processo, nunca exibido/editado na UI). Deliberadamente NÃO é por grupo — ver UnidadeGrupo pra
+// unidade remetente/destino do processo, essas sim por grupo.
 model Unidade {
   id           String   @id @default(uuid()) // ID único da unidade (UUID gerado automaticamente) - Chave primária
   nome         String   @unique // Nome completo da unidade - Obrigatório - Único - Exemplo: "Coordenadoria Jurídica"
@@ -81,11 +102,31 @@ model Unidade {
   atualizadoEm DateTime @default(now()) @updatedAt // Data e hora da última atualização do registro - DateTime - Atualizado automaticamente a cada modificação
 
   usuarios  Usuario[] // Lista de usuários pertencentes a esta unidade - Array de Usuario - Usuários vinculados à unidade
-  processos processo[] // Lista de processos cadastrados por esta unidade - Array de processo - Processos vinculados à unidade
-  processosRemetentes processo[] @relation("UnidadeRemetente") // Lista de processos onde esta unidade é a remetente - Array de processo - Processos remetidos por esta unidade
-  processosDestinatarios processo[] @relation("UnidadeDestino") // Lista de processos onde esta unidade é a destinatária - Array de processo - Processos destinados a esta unidade
+  processos processo[] // Lista de processos cadastrados por esta unidade (unidade_id = quem cadastrou) - Array de processo
 
   @@map("unidades")
+}
+
+// Model: UnidadeGrupo | Tabela: unidades_grupo | Descrição: Unidades usadas em processo (remetente/destino) —
+// por grupo (mesmo princípio de processo.grupo_id/Interessado.grupo_id): único POR GRUPO, não no sistema
+// inteiro; o mesmo nome/sigla pode existir em grupos diferentes como cadastros independentes.
+model UnidadeGrupo {
+  id           String   @id @default(uuid())
+  nome         String
+  sigla        String
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
+  grupo_id     String
+  grupo        Grupo    @relation(fields: [grupo_id], references: [id])
+
+  processosRemetentes    processo[] @relation("UnidadeGrupoRemetente") // Processos onde esta unidade é a remetente
+  processosDestinatarios processo[] @relation("UnidadeGrupoDestino") // Processos onde esta unidade é a destinatária
+
+  @@unique([nome, grupo_id])
+  @@unique([sigla, grupo_id])
+  @@index([grupo_id])
+  @@map("unidades_grupo")
 }
 
 // Model: Usuario | Tabela: usuarios | Descrição: Armazena informações dos usuários do sistema (servidores da secretaria)
@@ -126,10 +167,10 @@ model processo {
   origem                  String      @default("EXPEDIENTE") // Unidade de origem do processo - String - Obrigatório - Unidade que originou/solicitou o processo - Exemplo: "EXPEDIENTE", "COORDENADORIA_JURIDICA" - Valor padrão: EXPEDIENTE
   interessado_id          String? // ID do interessado (chave estrangeira) - String (UUID) - Opcional - Referência ao interessado do processo
   interessado             Interessado? @relation(fields: [interessado_id], references: [id]) // Relacionamento com o modelo Interessado - Interessado do processo
-  unidade_remetente_id    String? // ID da unidade remetente (chave estrangeira) - String (UUID) - Opcional - Referência à unidade que está remetendo o processo
-  unidadeRemetente        Unidade?    @relation("UnidadeRemetente", fields: [unidade_remetente_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade remetente do processo
-  unidade_destino_id      String? // ID da unidade destinatária (chave estrangeira) - String (UUID) - Opcional - Referência à unidade que é a destinatária do processo
-  unidadeDestino          Unidade?    @relation("UnidadeDestino", fields: [unidade_destino_id], references: [id]) // Relacionamento com o modelo Unidade - Unidade destinatária do processo
+  unidade_remetente_id    String? // ID da unidade remetente (chave estrangeira) - String (UUID) - Opcional - Referência à UnidadeGrupo (por grupo) que está remetendo o processo
+  unidadeRemetente        UnidadeGrupo? @relation("UnidadeGrupoRemetente", fields: [unidade_remetente_id], references: [id]) // Relacionamento com o modelo UnidadeGrupo - Unidade remetente do processo
+  unidade_destino_id      String? // ID da unidade destinatária (chave estrangeira) - String (UUID) - Opcional - Referência à UnidadeGrupo (por grupo) que é a destinatária do processo
+  unidadeDestino          UnidadeGrupo? @relation("UnidadeGrupoDestino", fields: [unidade_destino_id], references: [id]) // Relacionamento com o modelo UnidadeGrupo - Unidade destinatária do processo
   prazo                   DateTime? // Prazo limite para conclusão do processo - DateTime (opcional) - Exemplo: "2025-12-31T00:00:00.000Z"
   prorrogacao             DateTime? // Nova data limite caso o processo tenha sido prorrogado - DateTime (opcional) - Semelhante ao campo de andamentos
   data_recebimento        DateTime    @default(now()) // Data em que o gabinete recebeu o processo - DateTime - Valor padrão: Data/hora atual - Pode ser data atual ou anterior
@@ -183,6 +224,7 @@ model andamento {
   prazo                  DateTime? // Data limite para retorno do processo à unidade de origem - DateTime (opcional) - Valor padrão: null - Pode ser preenchida na criação ou posteriormente - Data até a qual o processo deve ser retornado. Se não retornado até esta data, está em atraso
   prorrogacao            DateTime? // Nova data limite caso o processo tenha sido prorrogado - DateTime (opcional) - Se preenchido, indica que o prazo foi prorrogado e esta é a nova data limite - Observação: Quando preenchido, o status deve ser alterado para PRORROGADO
   resposta               DateTime? // Data em que o processo recebeu resposta e foi retornado à unidade de origem - DateTime (opcional) - Data em que o processo foi finalizado e devolvido. Se preenchido, o status deve ser CONCLUIDO
+  data_final             DateTime? // Data final do andamento - DateTime (opcional) - Campo livre, independente de `resposta`/status - preenchido manualmente pelo usuário
   status                 StatusAndamento @default(EM_ANDAMENTO) // Status atual do andamento - Enum (StatusAndamento) - Valor padrão: EM_ANDAMENTO - Valores: EM_ANDAMENTO (em tramitação), CONCLUIDO (concluído e retornado), PRORROGADO (prazo prorrogado)
   observacao             String? // Observações sobre o andamento - String (opcional) - Campo livre para anotações, justificativas de prorrogação, ou outras informações relevantes
   assunto                String? @db.Text // Assunto específico do andamento - String (TEXT no banco) - Opcional - Campo independente do assunto do processo, pode conter informações específicas sobre este envio/tramitação
@@ -243,6 +285,8 @@ model Grupo {
   processos processo[]
   permissoes GrupoPermissoes[] // Permissões concedidas a este grupo (baseline para qualquer membro com este grupo ativo)
   permissoesUsuarios UsuarioPermissoes[] // Permissões individuais escopadas a este grupo (ver model UsuarioPermissoes)
+  unidadesGrupo UnidadeGrupo[] // Unidades (remetente/destino) cadastradas por este grupo
+  interessados  Interessado[] // Interessados cadastrados por este grupo
 
   @@unique([codigo, tipo])
   @@index([codigo])

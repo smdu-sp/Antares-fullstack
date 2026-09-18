@@ -11,8 +11,11 @@ export const createProcessoSchema = z.object({
     .optional(),
   origem: z.string().min(2, 'Origem deve ter ao menos 2 caracteres.').optional(),
   interessado_id: z.string().uuid('ID do interessado deve ser um UUID válido.').optional(),
+  interessado: z.string().optional(),
   unidade_remetente_id: z.string().uuid('ID da unidade remetente deve ser um UUID válido.').optional(),
+  unidade_remetente: z.string().optional(),
   unidade_destino_id: z.string().uuid('ID da unidade destinatária deve ser um UUID válido.').optional(),
+  unidade_destino: z.string().optional(),
   data_recebimento: isoDateString('Data de recebimento deve ser uma data válida.').optional(),
   data_envio_unidade: isoDateString('Data de envio para unidade deve ser uma data válida.').optional(),
   prazo: isoDateString('Prazo deve ser uma data válida.').optional(),
@@ -23,14 +26,11 @@ export const createProcessoSchema = z.object({
 });
 
 /**
- * Porte de UpdateProcessoDto (PartialType de CreateProcessoDto + campos alternativos
- * `interessado`/`unidade_remetente`/`unidade_destino` sem validação no DTO original).
+ * Porte de UpdateProcessoDto (PartialType de CreateProcessoDto — os campos
+ * alternativos `interessado`/`unidade_remetente`/`unidade_destino` já vêm de
+ * createProcessoSchema, usados tanto na criação quanto na atualização).
  */
-export const updateProcessoSchema = createProcessoSchema.partial().extend({
-  interessado: z.string().optional(),
-  unidade_remetente: z.string().optional(),
-  unidade_destino: z.string().optional(),
-});
+export const updateProcessoSchema = createProcessoSchema.partial();
 
 /** Porte de CreateRespostaFinalDto (Antares-backend/src/processos/dto/create-resposta-final.dto.ts). */
 export const createRespostaFinalSchema = z.object({

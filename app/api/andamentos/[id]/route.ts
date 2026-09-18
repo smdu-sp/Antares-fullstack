@@ -33,7 +33,12 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM', 'TEC']);
+    // USR incluído aqui pra bater com a permissão granular já configurada em
+    // GrupoPermissoes (USR:andamento.modificar_grupo/_proprios existem pros
+    // grupos de produção) — sem isso, USR nunca alcançava a checagem fina
+    // abaixo e sempre recebia "Acesso negado" ao editar andamento, mesmo
+    // tendo a capacidade concedida. Mesmo padrão já usado nas rotas de processo.
+    await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
     await requirePermissao(usuario.id, 'andamento.modificar', request.headers.get('x-grupo-ativo-id'));
 
     const { id } = await params;

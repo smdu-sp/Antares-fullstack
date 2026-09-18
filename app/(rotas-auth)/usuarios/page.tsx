@@ -13,12 +13,19 @@ import { Suspense } from "react";
 import { columns } from "./_components/columns";
 import ModalUpdateAndCreate from "./_components/modal-update-create";
 import MatrizPermissoesTab from "./_components/matriz-permissoes-tab";
+import UnidadesCadastroTab from "./_components/unidades-cadastro-tab";
 
 export default async function UsuariosPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const session = await auth();
+  // Mesma fronteira de vínculo de grupo/papel na criação de usuário
+  // (form-usuario.tsx) — gestão do catálogo global de unidades é um ajuste de
+  // sistema, não do dia a dia de um ADM comum.
+  const isDev = session?.usuario?.dev === true;
+
   return (
     <div className="w-full px-0 md:px-8 pb-20 md:pb-14 h-full md:container mx-auto">
       <h1 className="text-xl md:text-4xl font-bold mt-5 mb-5">Usuários</h1>
@@ -27,6 +34,7 @@ export default async function UsuariosPage({
         <TabsList>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="matriz">Matriz de Permissões</TabsTrigger>
+          {isDev && <TabsTrigger value="unidades">Unidades (cadastro)</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="usuarios" className="mt-4">
@@ -38,6 +46,12 @@ export default async function UsuariosPage({
         <TabsContent value="matriz" className="mt-4">
           <MatrizPermissoesTab />
         </TabsContent>
+
+        {isDev && (
+          <TabsContent value="unidades" className="mt-4">
+            <UnidadesCadastroTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

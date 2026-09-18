@@ -6,6 +6,7 @@ import type { UpdateProcessoInput } from '@/lib/server/validation/processos.sche
 import { buscarPorId } from './buscar-por-id';
 import { usuarioTemPermissaoGrupoNoProcesso } from './usuario-tem-permissao-grupo';
 import { mapProcessoToResponseDto } from './map-processo-response';
+import { resolverInteressadoPorTexto, resolverUnidadeGrupoPorTexto } from './resolver-vinculos-texto';
 
 /** Porte de ProcessosService.atualizar (Antares-backend/src/processos/processos.service.ts). */
 export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_id: string) {
@@ -44,61 +45,43 @@ export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_
   let unidadeDestinoId: string | null = null;
 
   if (dados.interessado_id) {
+    // Escopado ao grupo do processo — interessado é por-grupo (ver
+    // Interessado.grupo_id): não dá pra vincular um interessado de outro grupo.
     const interessadoExistente = await prisma.interessado.findUnique({
-      where: { id: dados.interessado_id, ativo: true },
+      where: { id: dados.interessado_id, ativo: true, grupo_id: processoExistente.grupo_id },
     });
     if (!interessadoExistente) throw new HttpError(400, 'Interessado não encontrado.');
     interessadoId = dados.interessado_id;
   }
 
   if (dados.interessado && dados.interessado.trim() !== '') {
-    let interessado = await prisma.interessado.findFirst({
-      where: { valor: dados.interessado.trim(), ativo: true },
-    });
-    if (!interessado) {
-      interessado = await prisma.interessado.create({ data: { valor: dados.interessado.trim() } });
-    }
-    interessadoId = interessado.id;
+    interessadoId = await resolverInteressadoPorTexto(dados.interessado, processoExistente.grupo_id);
   }
 
   if (dados.unidade_remetente_id) {
-    const unidadeExistente = await prisma.unidade.findUnique({ where: { id: dados.unidade_remetente_id } });
+    // Escopado ao grupo do processo — unidade remetente/destino é por-grupo
+    // (UnidadeGrupo, não o catálogo global Unidade — ver schema.prisma).
+    const unidadeExistente = await prisma.unidadeGrupo.findUnique({
+      where: { id: dados.unidade_remetente_id, grupo_id: processoExistente.grupo_id },
+    });
     if (!unidadeExistente) throw new HttpError(400, 'Unidade remetente não encontrada.');
     unidadeRemetenteId = dados.unidade_remetente_id;
   }
 
   if (dados.unidade_remetente && dados.unidade_remetente.trim() !== '') {
-    const unidade = await prisma.unidade.findFirst({
-      where: {
-        OR: [{ nome: dados.unidade_remetente.trim() }, { sigla: dados.unidade_remetente.trim() }],
-        ativo: true,
-      },
-    });
-    if (unidade) {
-      unidadeRemetenteId = unidade.id;
-    } else {
-      throw new HttpError(400, `Unidade remetente "${dados.unidade_remetente}" não encontrada.`);
-    }
+    unidadeRemetenteId = await resolverUnidadeGrupoPorTexto(dados.unidade_remetente, processoExistente.grupo_id);
   }
 
   if (dados.unidade_destino_id) {
-    const unidadeExistente = await prisma.unidade.findUnique({ where: { id: dados.unidade_destino_id } });
+    const unidadeExistente = await prisma.unidadeGrupo.findUnique({
+      where: { id: dados.unidade_destino_id, grupo_id: processoExistente.grupo_id },
+    });
     if (!unidadeExistente) throw new HttpError(400, 'Unidade destinatária não encontrada.');
     unidadeDestinoId = dados.unidade_destino_id;
   }
 
   if (dados.unidade_destino && dados.unidade_destino.trim() !== '') {
-    const unidade = await prisma.unidade.findFirst({
-      where: {
-        OR: [{ nome: dados.unidade_destino.trim() }, { sigla: dados.unidade_destino.trim() }],
-        ativo: true,
-      },
-    });
-    if (unidade) {
-      unidadeDestinoId = unidade.id;
-    } else {
-      throw new HttpError(400, `Unidade destinatária "${dados.unidade_destino}" não encontrada.`);
-    }
+    unidadeDestinoId = await resolverUnidadeGrupoPorTexto(dados.unidade_destino, processoExistente.grupo_id);
   }
 
   const dadosAtualizacao: Prisma.processoUncheckedUpdateInput = {

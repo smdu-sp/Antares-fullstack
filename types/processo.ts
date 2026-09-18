@@ -30,6 +30,7 @@ export interface IAndamento {
   conclusao?: Date | null;
   status: StatusAndamento;
   data_resposta?: Date | null;
+  data_final?: Date | null;
   assunto?: string | null;
   observacao?: string | null;
   ativo: boolean;

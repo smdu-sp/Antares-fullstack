@@ -5,6 +5,7 @@ import { criar as criarLog } from '@/lib/server/logs/criar';
 import type { CreateProcessoInput } from '@/lib/server/validation/processos.schema';
 import { obterGrupoAtivoIdSimples } from '@/lib/server/shared/grupo-processo';
 import { mapProcessoToResponseDto } from './map-processo-response';
+import { resolverInteressadoPorTexto, resolverUnidadeGrupoPorTexto } from './resolver-vinculos-texto';
 
 /** Porte de ProcessosService.criar (Antares-backend/src/processos/processos.service.ts). */
 export async function criar(dados: CreateProcessoInput, usuario_id: string) {
@@ -34,19 +35,39 @@ export async function criar(dados: CreateProcessoInput, usuario_id: string) {
   });
   if (processoExistente) throw new HttpError(400, 'Já existe um processo com este número SEI neste grupo.');
 
-  if (dados.interessado_id) {
-    const interessado = await prisma.interessado.findUnique({ where: { id: dados.interessado_id, ativo: true } });
+  // Cada campo aceita id (já resolvido, ex.: escolhido de uma lista) OU texto
+  // livre (sem sugestão/dropdown na grid — achar ou criar acontece aqui).
+  let interessadoId = dados.interessado_id || null;
+  if (interessadoId) {
+    // Escopado ao grupo ativo — interessado é por-grupo (Interessado.grupo_id).
+    const interessado = await prisma.interessado.findUnique({
+      where: { id: interessadoId, ativo: true, grupo_id: grupoAtivoId },
+    });
     if (!interessado) throw new HttpError(400, 'Interessado não encontrado.');
+  } else if (dados.interessado && dados.interessado.trim() !== '') {
+    interessadoId = await resolverInteressadoPorTexto(dados.interessado, grupoAtivoId);
   }
 
-  if (dados.unidade_remetente_id) {
-    const unidadeRemetente = await prisma.unidade.findUnique({ where: { id: dados.unidade_remetente_id } });
+  let unidadeRemetenteId = dados.unidade_remetente_id || null;
+  if (unidadeRemetenteId) {
+    // Unidade remetente/destino de processo é UnidadeGrupo (por grupo), não
+    // o catálogo global Unidade (usado só no cadastro de usuário).
+    const unidadeRemetente = await prisma.unidadeGrupo.findUnique({
+      where: { id: unidadeRemetenteId, grupo_id: grupoAtivoId },
+    });
     if (!unidadeRemetente) throw new HttpError(400, 'Unidade remetente não encontrada.');
+  } else if (dados.unidade_remetente && dados.unidade_remetente.trim() !== '') {
+    unidadeRemetenteId = await resolverUnidadeGrupoPorTexto(dados.unidade_remetente, grupoAtivoId);
   }
 
-  if (dados.unidade_destino_id) {
-    const unidadeDestino = await prisma.unidade.findUnique({ where: { id: dados.unidade_destino_id } });
+  let unidadeDestinoId = dados.unidade_destino_id || null;
+  if (unidadeDestinoId) {
+    const unidadeDestino = await prisma.unidadeGrupo.findUnique({
+      where: { id: unidadeDestinoId, grupo_id: grupoAtivoId },
+    });
     if (!unidadeDestino) throw new HttpError(400, 'Unidade destinatária não encontrada.');
+  } else if (dados.unidade_destino && dados.unidade_destino.trim() !== '') {
+    unidadeDestinoId = await resolverUnidadeGrupoPorTexto(dados.unidade_destino, grupoAtivoId);
   }
 
   if (dados.origem && dados.origem.trim() !== '') {
@@ -62,9 +83,9 @@ export async function criar(dados: CreateProcessoInput, usuario_id: string) {
       numero_sei: numeroSei,
       assunto: dados.assunto || 'Assunto a ser definido',
       origem: dados.origem || 'EXPEDIENTE',
-      interessado_id: dados.interessado_id || null,
-      unidade_remetente_id: dados.unidade_remetente_id || null,
-      unidade_destino_id: dados.unidade_destino_id || null,
+      interessado_id: interessadoId,
+      unidade_remetente_id: unidadeRemetenteId,
+      unidade_destino_id: unidadeDestinoId,
       data_recebimento: dados.data_recebimento ? new Date(dados.data_recebimento) : undefined,
       data_envio_unidade: dados.data_envio_unidade ? new Date(dados.data_envio_unidade) : undefined,
       prazo: dados.prazo ? new Date(dados.prazo) : undefined,

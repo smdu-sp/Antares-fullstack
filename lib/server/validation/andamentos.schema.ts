@@ -12,6 +12,7 @@ export const createAndamentoSchema = z.object({
   status: z.nativeEnum(StatusAndamento, { errorMap: () => ({ message: 'Status inválido.' }) }).optional(),
   observacao: z.string().optional(),
   assunto: z.string().optional(),
+  data_final: isoDateString('Data final deve ser uma data válida.').nullable().optional(),
 });
 
 /**

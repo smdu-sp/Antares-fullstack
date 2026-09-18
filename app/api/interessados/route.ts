@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const dados = createInteressadoSchema.parse(body);
-    const interessado = await criar(dados);
+    const interessado = await criar(dados, usuario.id);
 
     return jsonResponse(interessado, { status: 201 });
   } catch (error) {
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const limite = Number(searchParams.get('limite')) || undefined;
     const busca = searchParams.get('busca') || undefined;
 
-    const resultado = await buscarTudo(pagina, limite, busca);
+    const resultado = await buscarTudo(usuario.id, pagina, limite, busca);
 
     return jsonResponse(resultado);
   } catch (error) {

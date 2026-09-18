@@ -47,6 +47,7 @@ import {
   Check,
   X,
   FileDown,
+  Copy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -55,8 +56,6 @@ import { Textarea } from "@/components/ui/textarea";
 import DateCellEditor from "@/components/date-cell-editor";
 import ModalDeleteProcesso from "@/app/(rotas-auth)/processos/_components/modal-delete-processo";
 import ModalDeleteAndamento from "@/app/(rotas-auth)/processos/_components/modal-delete-andamento";
-import InteressadoAutocompleteCellEditor from "@/components/interessado-autocomplete-cell-editor";
-import UnidadeAutocompleteEditor from "@/components/unidade-autocomplete-editor";
 import { ExportAndamentoButton } from "@/components/export-andamento-button";
 import { ExportProcessoButton } from "@/components/export-processo-button";
 import { ExportProcessosEmLote } from "@/components/export-processos-em-lote";
@@ -101,6 +100,77 @@ function corDestaque(
   isDark: boolean,
 ): { backgroundColor: string; color: string } {
   return CORES_DESTAQUE[cor][isDark ? "dark" : "light"];
+}
+
+// Controla o scroll (roda do mouse) de uma grid: (1) Shift + roda rola as
+// colunas (horizontal) em vez das linhas — convenção comum em planilhas,
+// evita depender só de arrastar a barra embaixo da grid; (2) isola o scroll
+// da grid de andamentos (aninhada dentro de uma linha expandida da grid de
+// processos) pra não "vazar" e rolar a grid de fora junto — sem isso, o
+// evento de wheel simplesmente borbulha pro DOM da grid de processos, que
+// tem seu próprio tratamento de scroll (via JS, não só CSS) e reage a ele
+// mesmo a rolagem tendo sido consumida pela grid de andamentos por dentro.
+// `overscrollBehavior: contain` (nos estilos inline dos wrappers) já resolve
+// o vazamento pra fora da grid → página (scroll nativo do navegador); isso
+// aqui resolve o caso grid-dentro-de-grid, que é tratado em JS pelo próprio
+// AG-Grid e não responde a CSS.
+//
+// Só faz `stopPropagation()` quando a própria grid ainda tem pra onde rolar
+// na direção do wheel — ao chegar no limite (topo/fim, ou início/fim das
+// colunas), deixa borbulhar normalmente, permitindo continuar rolando a
+// grid de fora (mesmo encadeamento que o scroll nativo já faz).
+//
+// Precisa ser um listener nativo com `passive: false`: o React usa listeners
+// passivos por padrão pra wheel/touch, e `preventDefault()` não funcionaria
+// dentro de um `onWheel` normal do JSX.
+function configurarScrollDaGrid(wrapperEl: HTMLElement | null) {
+  if (!wrapperEl) return () => {};
+
+  const podeRolar = (
+    el: HTMLElement,
+    delta: number,
+    posProp: "scrollTop" | "scrollLeft",
+    tamanhoProp: "clientHeight" | "clientWidth",
+    tamanhoTotalProp: "scrollHeight" | "scrollWidth",
+  ) => {
+    if (delta < 0) return el[posProp] > 0;
+    if (delta > 0) return el[posProp] + el[tamanhoProp] < el[tamanhoTotalProp] - 1;
+    return false;
+  };
+
+  const onWheel = (e: WheelEvent) => {
+    const viewportHorizontal =
+      wrapperEl.querySelector<HTMLElement>(".ag-center-cols-viewport") ||
+      wrapperEl.querySelector<HTMLElement>(".ag-body-viewport");
+
+    if (e.shiftKey) {
+      if (!viewportHorizontal) return;
+      // Alguns navegadores já convertem shift+roda em deltaX sozinhos; quando
+      // não convertem, o delta chega em deltaY mesmo com shift pressionado.
+      const delta = e.deltaX || e.deltaY;
+      if (podeRolar(viewportHorizontal, delta, "scrollLeft", "clientWidth", "scrollWidth")) {
+        e.preventDefault();
+        e.stopPropagation();
+        // `.ag-center-cols-viewport` é o elemento que o próprio AG-Grid
+        // escuta pra sincronizar cabeçalho/colunas fixas/barra de rolagem
+        // visível — só precisa setar `scrollLeft` nele, o resto já segue
+        // (mesmo mecanismo usado quando o usuário arrasta a barra manualmente).
+        viewportHorizontal.scrollLeft += delta;
+      }
+      return;
+    }
+
+    const viewportVertical = wrapperEl.querySelector<HTMLElement>(".ag-body-viewport");
+    if (
+      viewportVertical &&
+      podeRolar(viewportVertical, e.deltaY, "scrollTop", "clientHeight", "scrollHeight")
+    ) {
+      e.stopPropagation();
+    }
+  };
+
+  wrapperEl.addEventListener("wheel", onWheel, { passive: false });
+  return () => wrapperEl.removeEventListener("wheel", onWheel);
 }
 
 // Registrar todos os módulos da comunidade AG-Grid
@@ -177,8 +247,14 @@ function AndamentosDetail({
     useState(false);
   const timeoutRefInteressado = useRef<NodeJS.Timeout | null>(null);
   const gridRef = useRef<AgGridReact>(null);
+  const gridWrapperRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const savingRef = useRef<Set<string>>(new Set()); // Prevenir salvamentos duplicados
+
+  useEffect(
+    () => configurarScrollDaGrid(gridWrapperRef.current),
+    [],
+  );
 
   useEffect(() => {
     async function loadAndamentos() {
@@ -228,6 +304,39 @@ function AndamentosDetail({
     };
     setAndamentos([...andamentos, novoAndamento]);
   };
+
+  // Duplica só os campos descritivos (origem/destino/assunto/observação) —
+  // prazo/prorrogação/resposta/data final nascem em branco e status volta
+  // pro padrão, de propósito (não é um clone de histórico, é atalho pra
+  // repetir o mesmo trajeto). Cria direto no servidor (em vez do mecanismo de
+  // linha-rascunho `_isNew`, que só dispara a criação quando o usuário edita
+  // uma célula) pra funcionar com um clique só.
+  const duplicarAndamento = useCallback(
+    async (origem: IAndamento) => {
+      if (!session?.access_token) return;
+
+      const dataToCreate = {
+        processo_id: processo.id,
+        origem: origem.origem,
+        destino: origem.destino,
+        data_envio: new Date().toISOString(),
+        status: "EM_ANDAMENTO",
+        assunto: origem.assunto || undefined,
+        observacao: origem.observacao || undefined,
+      };
+
+      const response = await andamento.server.criar(dataToCreate as any);
+      if (response.ok && response.data) {
+        setAndamentos([response.data as IAndamento, ...andamentos]);
+        toast.success("Andamento duplicado");
+      } else {
+        toast.error("Erro ao duplicar andamento", {
+          description: response.error || undefined,
+        });
+      }
+    },
+    [session?.access_token, processo.id, andamentos],
+  );
 
   const handleSaveAssunto = async () => {
     if (!novoAssunto.trim()) {
@@ -465,6 +574,10 @@ function AndamentosDetail({
             field === "data_resposta"
               ? event.newValue
               : andamentoAtualizado.data_resposta,
+          data_final:
+            field === "data_final"
+              ? event.newValue
+              : andamentoAtualizado.data_final,
           observacao:
             field === "observacao"
               ? event.newValue
@@ -495,6 +608,8 @@ function AndamentosDetail({
           dataToSave.prorrogacao = convertDateField(dataToSave.prorrogacao);
         if (dataToSave.resposta)
           dataToSave.resposta = convertDateField(dataToSave.resposta);
+        if (dataToSave.data_final)
+          dataToSave.data_final = convertDateField(dataToSave.data_final);
 
         // Se data_resposta foi inserida e o status não é CONCLUIDO, marcar como CONCLUIDO automaticamente
         if (
@@ -542,16 +657,24 @@ function AndamentosDetail({
             dataToSave,
           );
           if (response.ok) {
-            // Atualizar o estado local com os dados salvos
+            // Atualizar o estado local com os dados salvos. `dataToSave` usa
+            // o nome de campo do backend (`resposta`), não `data_resposta`
+            // (o nome do campo na grid/IAndamento) — comparar contra o nome
+            // errado fazia essa cláusula nunca disparar, então a edição só
+            // aparecia na grid depois de recarregar a página.
             const updatedAndamentos = andamentos.map((a) => {
               if (a.id === andamentoAtualizado.id) {
                 return {
                   ...a,
                   status: dataToSave.status || a.status,
                   data_resposta:
-                    dataToSave.data_resposta !== undefined
-                      ? dataToSave.data_resposta
+                    dataToSave.resposta !== undefined
+                      ? dataToSave.resposta
                       : a.data_resposta,
+                  data_final:
+                    dataToSave.data_final !== undefined
+                      ? dataToSave.data_final
+                      : a.data_final,
                 };
               }
               return a;
@@ -590,7 +713,6 @@ function AndamentosDetail({
         field: "origem",
         headerName: "Origem",
         editable: true,
-        cellEditor: UnidadeAutocompleteEditor,
         valueSetter: (params) => {
           params.data.origem = params.newValue;
           return true;
@@ -613,7 +735,6 @@ function AndamentosDetail({
         field: "destino",
         headerName: "Destino",
         editable: true,
-        cellEditor: UnidadeAutocompleteEditor,
         valueSetter: (params) => {
           params.data.destino = params.newValue;
           return true;
@@ -741,6 +862,26 @@ function AndamentosDetail({
         width: 150,
       },
       {
+        field: "data_final",
+        headerName: "Data Final",
+        editable: true,
+        cellEditor: DateCellEditor,
+        valueGetter: (params) => {
+          return parseUTCDate(params.data?.data_final);
+        },
+        valueSetter: (params) => {
+          params.data.data_final = params.newValue
+            ? params.newValue.toISOString()
+            : null;
+          return true;
+        },
+        valueFormatter: (params) => {
+          if (!params.value) return "";
+          return format(params.value, "dd/MM/yyyy", { locale: ptBR });
+        },
+        width: 150,
+      },
+      {
         field: "observacao",
         headerName: "Observação",
         editable: true,
@@ -751,7 +892,7 @@ function AndamentosDetail({
       {
         headerName: "Ações",
         field: "acoes",
-        width: 120,
+        width: 150,
         sortable: false,
         filter: false,
         editable: false,
@@ -769,7 +910,17 @@ function AndamentosDetail({
           return (
             <div className="flex items-center justify-center h-full gap-1">
               {!ehNovo && (
-                <ExportAndamentoButton andamentoId={andamentoData.id} />
+                <>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    title="Duplicar andamento"
+                    onClick={() => duplicarAndamento(andamentoData)}
+                  >
+                    <Copy size={16} />
+                  </Button>
+                  <ExportAndamentoButton andamentoId={andamentoData.id} />
+                </>
               )}
               <ModalDeleteAndamento
                 andamento={andamentoData}
@@ -781,7 +932,7 @@ function AndamentosDetail({
         },
       },
     ],
-    [andamentos],
+    [andamentos, duplicarAndamento],
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -815,7 +966,7 @@ function AndamentosDetail({
       }`}
       style={{ width: "100%", minHeight: "200px" }}
     >
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex items-center gap-3 mb-4">
         <h3
           className={`text-lg font-semibold ${
             theme === "dark" || (theme === "system" && systemTheme === "dark")
@@ -974,6 +1125,7 @@ function AndamentosDetail({
       </div>
 
       <div
+        ref={gridWrapperRef}
         className={`${
           theme === "dark" || (theme === "system" && systemTheme === "dark")
             ? "ag-theme-alpine-dark dark"
@@ -985,6 +1137,11 @@ function AndamentosDetail({
             width: "100%",
             overflowX: "auto",
             overflowY: "auto",
+            // Sem isso, ao chegar no topo/fim do scroll interno da grid (com
+            // o ponteiro ainda em cima dela) o scroll "vaza" e continua
+            // rolando a página por trás — contain impede esse vazamento sem
+            // afetar em nada o scroll da página quando o ponteiro está fora.
+            overscrollBehavior: "contain",
             // Estas variáveis só ajustam a paleta de células/header por cima da
             // classe base (ag-theme-alpine-dark, aplicada acima) — é a classe
             // que garante o resto (popups, menus, dropdown de agSelectCellEditor
@@ -1059,6 +1216,7 @@ export default function ProcessosSpreadsheet({
   concluidos = false,
 }: ProcessosSpreadsheetProps) {
   const gridRef = useRef<AgGridReact>(null);
+  const gridWrapperRef = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
   const router = useRouter();
   const { theme, systemTheme } = useTheme();
@@ -1072,6 +1230,10 @@ export default function ProcessosSpreadsheet({
     // isso a troca de tema em runtime não recolore linhas/células já desenhadas.
     gridRef.current?.api?.redrawRows();
   }, [theme, systemTheme]);
+  useEffect(
+    () => configurarScrollDaGrid(gridWrapperRef.current),
+    [],
+  );
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const expandedRowsRef = useRef<Set<string>>(new Set());
   const [processosLocal, setProcessosLocal] = useState<IProcesso[]>(processos);
@@ -1508,7 +1670,8 @@ export default function ProcessosSpreadsheet({
           headerName: "Nº SEI",
           editable: true,
           pinned: "left" as const,
-          width: 150,
+          width: 260,
+          minWidth: 200,
           cellStyle: { fontWeight: "bold" },
         },
         {
@@ -1531,7 +1694,6 @@ export default function ProcessosSpreadsheet({
           field: "origem",
           headerName: "Origem",
           editable: true,
-          cellEditor: UnidadeAutocompleteEditor,
           valueGetter: (params: any) => {
             if (params.data?._isDetail) return "";
             const processo = params.data as IProcesso;
@@ -1552,7 +1714,6 @@ export default function ProcessosSpreadsheet({
           field: "interessado",
           headerName: "Interessado",
           editable: true,
-          cellEditor: InteressadoAutocompleteCellEditor,
           valueGetter: (params: any) => {
             if (params.data?._isDetail) return "";
             const processo = params.data as IProcesso;
@@ -1657,7 +1818,6 @@ export default function ProcessosSpreadsheet({
           field: "unidadeRemetente",
           headerName: "Unidade Remetente",
           editable: true,
-          cellEditor: UnidadeAutocompleteEditor,
           valueGetter: (params: any) => {
             if (params.data?._isDetail) return "";
             const processo = params.data as IProcesso;
@@ -1668,14 +1828,26 @@ export default function ProcessosSpreadsheet({
           },
           valueFormatter: (params: any) => params.value || "",
           valueSetter: (params: ValueSetterParams) => {
-            const selected = params.newValue as string;
-            const sigla = selected?.split(" - ")[0];
-            const unidade = unidades.find((u) => u.sigla === sigla);
-            if (unidade) {
-              params.data.unidadeRemetente = unidade;
-              return true;
-            }
-            return false;
+            // Texto livre, sem sugestão: tenta achar um match local por
+            // sigla/nome (aceita ainda o formato antigo "SIGLA - Nome"); sem
+            // match, guarda como pendente — o backend acha ou cria (mesmo
+            // padrão já usado em "interessado" logo acima).
+            const texto = ((params.newValue as string) || "").trim();
+            if (!texto) return false;
+
+            const siglaDigitada = texto.includes(" - ")
+              ? texto.split(" - ")[0].trim()
+              : texto;
+            const unidade = unidades.find(
+              (u) => u.sigla === siglaDigitada || u.sigla === texto || u.nome === texto,
+            );
+
+            params.data.unidadeRemetente = unidade || {
+              id: `temp-${Date.now()}`,
+              sigla: "",
+              nome: texto,
+            };
+            return true;
           },
           width: 200,
         },
@@ -1683,7 +1855,6 @@ export default function ProcessosSpreadsheet({
           field: "unidadeDestino",
           headerName: "Unidade Destinatária",
           editable: true,
-          cellEditor: UnidadeAutocompleteEditor,
           valueGetter: (params: any) => {
             if (params.data?._isDetail) return "";
             const processo = params.data as IProcesso;
@@ -1694,14 +1865,22 @@ export default function ProcessosSpreadsheet({
           },
           valueFormatter: (params: any) => params.value || "",
           valueSetter: (params: ValueSetterParams) => {
-            const selected = params.newValue as string;
-            const sigla = selected?.split(" - ")[0];
-            const unidade = unidades.find((u) => u.sigla === sigla);
-            if (unidade) {
-              params.data.unidadeDestino = unidade;
-              return true;
-            }
-            return false;
+            const texto = ((params.newValue as string) || "").trim();
+            if (!texto) return false;
+
+            const siglaDigitada = texto.includes(" - ")
+              ? texto.split(" - ")[0].trim()
+              : texto;
+            const unidade = unidades.find(
+              (u) => u.sigla === siglaDigitada || u.sigla === texto || u.nome === texto,
+            );
+
+            params.data.unidadeDestino = unidade || {
+              id: `temp-${Date.now()}`,
+              sigla: "",
+              nome: texto,
+            };
+            return true;
           },
           width: 200,
         },
@@ -2033,33 +2212,13 @@ export default function ProcessosSpreadsheet({
             return new Date(value).toISOString();
           };
 
-          // Se tem um interessado com ID temporário, criar primeiro
-          let interessadoIdFinal = processoAtualizado.interessado_id;
-          if (
-            interessadoIdFinal &&
-            interessadoIdFinal.startsWith("temp-") &&
-            processoAtualizado.interessado
-          ) {
-            try {
-              const novoInteressado = {
-                valor: processoAtualizado.interessado,
-              };
-              const respostaInteressado =
-                await interessadoService.server.criar(novoInteressado);
-              if (respostaInteressado.ok && respostaInteressado.data) {
-                interessadoIdFinal = respostaInteressado.data.id;
-                toast.success("Novo interessado criado");
-              } else {
-                toast.error("Erro ao criar interessado", {
-                  description: respostaInteressado.error,
-                });
-                return;
-              }
-            } catch (error) {
-              toast.error("Erro ao criar interessado");
-              return;
-            }
-          }
+          // Sem sugestão/dropdown, o valueSetter de interessado/unidade
+          // remetente já resolve contra a lista local carregada; sem match,
+          // guarda um objeto local com id `temp-...` (ver colDefs acima) — o
+          // achar-ou-criar de verdade agora é 100% do servidor (mesmo padrão
+          // pros três campos), então basta mandar o texto em vez do id
+          // quando o id ainda é só o placeholder local.
+          const ehTemp = (id?: string | null) => !!id && id.startsWith("temp-");
 
           const dataToCreate: any = {
             numero_sei: processoAtualizado.numero_sei,
@@ -2074,40 +2233,25 @@ export default function ProcessosSpreadsheet({
               new Date().toISOString(),
           };
 
-          if (interessadoIdFinal) {
-            dataToCreate.interessado_id = interessadoIdFinal;
+          if (ehTemp(processoAtualizado.interessado_id)) {
+            if (processoAtualizado.interessado) {
+              dataToCreate.interessado = processoAtualizado.interessado;
+            }
+          } else if (processoAtualizado.interessado_id) {
+            dataToCreate.interessado_id = processoAtualizado.interessado_id;
           }
-          if (processoAtualizado.unidadeRemetente?.id) {
+
+          if (ehTemp(processoAtualizado.unidadeRemetente?.id)) {
+            if (processoAtualizado.unidadeRemetente?.nome) {
+              dataToCreate.unidade_remetente =
+                processoAtualizado.unidadeRemetente.nome;
+            }
+          } else if (processoAtualizado.unidadeRemetente?.id) {
             dataToCreate.unidade_remetente_id =
               processoAtualizado.unidadeRemetente.id;
-          } else if (
-            typeof (processoAtualizado as any).unidadeRemetente === "string" &&
-            (processoAtualizado as any).unidadeRemetente.includes(" - ")
-          ) {
-            const sigla = (processoAtualizado as any).unidadeRemetente.split(
-              " - ",
-            )[0];
-            const unidade = unidades.find((u) => u.sigla === sigla);
-            if (unidade) {
-              dataToCreate.unidade_remetente_id = unidade.id;
-            }
           }
-          // Não enviar unidade_destino_id na criação, só na atualização
-          // if (processoAtualizado.unidadeDestino?.id) {
-          //   dataToCreate.unidade_destino_id =
-          //     processoAtualizado.unidadeDestino.id;
-          // } else if (
-          //   typeof (processoAtualizado as any).unidadeDestino === "string" &&
-          //   (processoAtualizado as any).unidadeDestino.includes(" - ")
-          // ) {
-          //   const sigla = (processoAtualizado as any).unidadeDestino.split(
-          //     " - ",
-          //   )[0];
-          //   const unidade = unidades.find((u) => u.sigla === sigla);
-          //   if (unidade) {
-          //     dataToCreate.unidade_destino_id = unidade.id;
-          //   }
-          // }
+          // unidade_destino não vai na criação — só na atualização logo
+          // abaixo, depois que o processo já existe (ver bloco após criar()).
           if (processoAtualizado.prazo) {
             dataToCreate.prazo = convertDateField(processoAtualizado.prazo);
           }
@@ -2132,9 +2276,9 @@ export default function ProcessosSpreadsheet({
             // Se havia unidade destino definida, fazer atualização após criação
             if (processoAtualizado.unidadeDestino?.id) {
               try {
-                const updateData = {
-                  unidade_destino_id: processoAtualizado.unidadeDestino.id,
-                };
+                const updateData = ehTemp(processoAtualizado.unidadeDestino.id)
+                  ? { unidade_destino: processoAtualizado.unidadeDestino.nome }
+                  : { unidade_destino_id: processoAtualizado.unidadeDestino.id };
                 const updateResponse = await processoService.server.atualizar(
                   createdProcesso.id,
                   updateData,
@@ -2222,41 +2366,16 @@ export default function ProcessosSpreadsheet({
           return new Date(value).toISOString();
         };
 
-        // Mapear campos para os nomes corretos do backend
+        // Mapear campos para os nomes corretos do backend. Sem sugestão/
+        // dropdown, id `temp-...` (ver colDefs) significa "sem match local" —
+        // manda o texto em vez do id e deixa o servidor achar ou criar (mesmo
+        // padrão pros três campos: interessado, unidade remetente/destino).
         if (field === "interessado") {
-          let interessadoId = processoAtualizado.interessado_id;
-
-          // Se o ID começa com 'temp-', significa que é um novo interessado
-          // Precisa ser criado no backend
-          if (interessadoId && interessadoId.startsWith("temp-")) {
-            try {
-              const novoInteressado = {
-                valor: processoAtualizado.interessado,
-              };
-
-              const respostaInteressado =
-                await interessadoService.server.criar(novoInteressado);
-
-              if (respostaInteressado.ok && respostaInteressado.data) {
-                // Usar o ID real do interessado criado
-                interessadoId = respostaInteressado.data.id;
-                // Atualizar no estado local também
-                processoAtualizado.interessado_id = interessadoId;
-                toast.success("Novo interessado criado");
-              } else {
-                toast.error("Erro ao criar interessado", {
-                  description: respostaInteressado.error,
-                });
-                return;
-              }
-            } catch (error) {
-              toast.error("Erro ao criar interessado");
-              return;
-            }
+          if (processoAtualizado.interessado_id?.startsWith("temp-")) {
+            dataToUpdate.interessado = processoAtualizado.interessado;
+          } else {
+            dataToUpdate.interessado_id = processoAtualizado.interessado_id;
           }
-
-          // Enviar apenas interessado_id
-          dataToUpdate.interessado_id = interessadoId;
         } else if (
           field === "usuario_atribuido_nome" &&
           exibirAtribuicaoUsuario
@@ -2264,11 +2383,21 @@ export default function ProcessosSpreadsheet({
           dataToUpdate.usuario_atribuido_id =
             processoAtualizado.usuario_atribuido_id || null;
         } else if (field === "unidadeRemetente") {
-          dataToUpdate.unidade_remetente_id =
-            processoAtualizado.unidadeRemetente?.id;
+          if (processoAtualizado.unidadeRemetente?.id?.startsWith("temp-")) {
+            dataToUpdate.unidade_remetente =
+              processoAtualizado.unidadeRemetente?.nome;
+          } else {
+            dataToUpdate.unidade_remetente_id =
+              processoAtualizado.unidadeRemetente?.id;
+          }
         } else if (field === "unidadeDestino") {
-          dataToUpdate.unidade_destino_id =
-            processoAtualizado.unidadeDestino?.id;
+          if (processoAtualizado.unidadeDestino?.id?.startsWith("temp-")) {
+            dataToUpdate.unidade_destino =
+              processoAtualizado.unidadeDestino?.nome;
+          } else {
+            dataToUpdate.unidade_destino_id =
+              processoAtualizado.unidadeDestino?.id;
+          }
         } else if (
           field === "data_recebimento" ||
           field === "prazo" ||
@@ -2399,7 +2528,6 @@ export default function ProcessosSpreadsheet({
       router,
       processosLocal,
       exibirAtribuicaoUsuario,
-      unidades,
     ],
   );
 
@@ -2544,6 +2672,7 @@ export default function ProcessosSpreadsheet({
         }}
       >
         <div
+          ref={gridWrapperRef}
           className={`${
             theme === "dark" || (theme === "system" && systemTheme === "dark")
               ? "ag-theme-alpine-dark dark"
@@ -2555,6 +2684,11 @@ export default function ProcessosSpreadsheet({
               width: "100%",
               overflowX: "auto",
               overflowY: "auto",
+              // Sem isso, ao chegar no topo/fim do scroll interno da grid (com
+              // o ponteiro ainda em cima dela) o scroll "vaza" e continua
+              // rolando a página por trás — contain impede esse vazamento sem
+              // afetar em nada o scroll da página quando o ponteiro está fora.
+              overscrollBehavior: "contain",
               // Estas variáveis só ajustam a paleta de células/header por cima da
               // classe base (ag-theme-alpine-dark, aplicada acima) — é a classe
               // que garante o resto (popups, menus, dropdown de agSelectCellEditor

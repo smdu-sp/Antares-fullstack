@@ -6,6 +6,7 @@ export interface IInteressado {
   criadoEm: string;
   atualizadoEm: string;
   ativo?: boolean;
+  grupo_id?: string; // Grupo dono deste cadastro — cada grupo tem sua própria lista de interessados
 }
 
 export interface IPaginadoInteressado {

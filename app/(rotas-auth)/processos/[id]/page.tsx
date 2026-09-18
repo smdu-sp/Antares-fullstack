@@ -3,7 +3,9 @@
 import { auth } from "@/lib/auth/auth";
 import { redirect } from "next/navigation";
 import * as processo from "@/services/processos";
-import * as unidade from "@/services/unidades";
+// unidade_remetente_id aponta pra UnidadeGrupo (por grupo), não o catálogo
+// global (usado só no cadastro de usuário).
+import * as unidadeGrupo from "@/services/unidades-grupo";
 import { IProcesso } from "@/types/processo";
 import { IUnidade } from "@/types/unidade";
 import { Button } from "@/components/ui/button";
@@ -108,7 +110,7 @@ async function ProcessoDetalhesPage({
 
   // Enriquecer dados com informações das unidades
   if (processoData.interessado_id || processoData.unidade_remetente_id) {
-    const unidadesResponse = await unidade.listaCompleta(session.access_token);
+    const unidadesResponse = await unidadeGrupo.listaCompleta(session.access_token);
     if (unidadesResponse.ok && unidadesResponse.data) {
       const unidades = unidadesResponse.data as IUnidade[];
       const unidadesMap = new Map(unidades.map((u) => [u.id, u]));

@@ -24,7 +24,9 @@ import { useForm, ControllerRenderProps } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import * as andamento from "@/services/andamentos";
-import * as unidade from "@/services/unidades";
+// Unidade destino do andamento usa UnidadeGrupo (por grupo), não o catálogo
+// global (usado só no cadastro de usuário).
+import * as unidadeGrupo from "@/services/unidades-grupo";
 import { useTransition, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { CalendarIcon, Loader2 } from "lucide-react";
@@ -181,7 +183,7 @@ export default function FormAndamento({
   // Buscar lista de unidades
   useEffect(() => {
     if (session?.access_token) {
-      unidade.listaCompleta(session.access_token).then((response) => {
+      unidadeGrupo.listaCompleta(session.access_token).then((response) => {
         if (response.ok && response.data) {
           setUnidades(response.data as IUnidade[]);
         }

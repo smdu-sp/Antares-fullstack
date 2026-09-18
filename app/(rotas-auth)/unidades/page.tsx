@@ -5,7 +5,9 @@ import { Filtros } from "@/components/filtros";
 import Pagination from "@/components/pagination";
 import { auth } from "@/lib/auth/auth";
 import { AccessState } from "../_components/access-state";
-import * as unidade from "@/services/unidades";
+// /unidades é a tela por-grupo (unidade remetente/destino de processo) — o
+// catálogo global (usado só no cadastro de usuário) é gerido em /usuarios.
+import * as unidade from "@/services/unidades-grupo";
 import { IPaginadoUnidade, IUnidade } from "@/types/unidade";
 import { Suspense } from "react";
 import { columns } from "./_components/columns";

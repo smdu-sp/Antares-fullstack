@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { remover } from "@/services/unidades/server-functions";
+import { remover } from "@/services/unidades-grupo/server-functions";
 import { canAdmin } from "@/lib/access-control";
 import { Loader2, Trash2 } from "lucide-react";
 import { useTransition } from "react";

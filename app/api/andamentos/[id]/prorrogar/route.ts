@@ -14,7 +14,10 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const usuario = await requireAuth(request);
-    await requirePermissoes(usuario.id, ['ADM', 'TEC']);
+    // USR incluído pra bater com a permissão granular (GrupoPermissoes já
+    // concede USR:andamento.modificar_grupo/_proprios) — ver mesma nota em
+    // app/api/andamentos/route.ts.
+    await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
     await requirePermissao(usuario.id, 'andamento.modificar', request.headers.get('x-grupo-ativo-id'));
 
     const { id } = await params;

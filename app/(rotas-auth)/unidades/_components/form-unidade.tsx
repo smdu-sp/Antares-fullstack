@@ -13,7 +13,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { criar, atualizar } from '@/services/unidades/server-functions';
+import { criar, atualizar } from '@/services/unidades-grupo/server-functions';
 import { IUnidade } from '@/types/unidade';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';

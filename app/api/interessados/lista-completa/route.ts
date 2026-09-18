@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const usuario = await requireAuth(request);
     await requirePermissoes(usuario.id, ['ADM', 'TEC', 'USR']);
 
-    const interessados = await listaCompleta();
+    const interessados = await listaCompleta(usuario.id);
 
     return jsonResponse(interessados);
   } catch (error) {

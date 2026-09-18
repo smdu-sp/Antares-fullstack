@@ -38,6 +38,9 @@ export async function atualizar(id: string, updateAndamentoDto: UpdateAndamentoI
     data.data_envio = updateAndamentoDto.data_envio ? new Date(updateAndamentoDto.data_envio) : null;
   }
   if (updateAndamentoDto.prazo) data.prazo = new Date(updateAndamentoDto.prazo);
+  if (updateAndamentoDto.data_final !== undefined) {
+    data.data_final = updateAndamentoDto.data_final ? new Date(updateAndamentoDto.data_final) : null;
+  }
   if (payload.observacao !== undefined) data.observacao = payload.observacao;
   if (updateAndamentoDto.assunto !== undefined) data.assunto = updateAndamentoDto.assunto;
 

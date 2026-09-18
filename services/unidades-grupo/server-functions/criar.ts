@@ -1,0 +1,46 @@
+/** @format */
+
+"use server";
+
+import { redirect } from "next/navigation";
+import { ICreateUnidade, IRespostaUnidade, IUnidade } from "@/types/unidade";
+import { auth } from "@/lib/auth/auth";
+import { buildAuthHeaders } from "@/lib/http/auth-headers";
+import { revalidateTag } from "next/cache";
+import { getInternalApiUrl } from "@/lib/http/get-internal-api-url";
+
+/** Espelha services/unidades/server-functions/criar.ts, pra unidades-grupo (por grupo). */
+export async function criar(data: ICreateUnidade): Promise<IRespostaUnidade> {
+  const session = await auth();
+  const baseURL = getInternalApiUrl();
+  if (!session) redirect("/login");
+
+  const response: Response = await fetch(`${baseURL}unidades-grupo`, {
+    method: "POST",
+    headers: buildAuthHeaders(session.access_token, session.grupoAtivo?.id),
+    body: JSON.stringify(data),
+  });
+  const dataResponse = await response.json();
+  if (response.status === 201) {
+    revalidateTag("unidades-grupo");
+    return {
+      ok: true,
+      error: null,
+      data: dataResponse as IUnidade,
+      status: 201,
+    };
+  }
+  if (!dataResponse)
+    return {
+      ok: false,
+      error: "Erro ao criar nova unidade.",
+      data: null,
+      status: response.status,
+    };
+  return {
+    ok: false,
+    error: dataResponse.message,
+    data: null,
+    status: response.status,
+  };
+}

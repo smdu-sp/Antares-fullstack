@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     const termo = new URL(request.url).searchParams.get('termo')?.trim();
 
     if (!termo || termo.length < 2) {
-      return jsonResponse(await listaCompleta());
+      return jsonResponse(await listaCompleta(usuario.id));
     }
 
-    return jsonResponse(await buscarPorTermo(termo));
+    return jsonResponse(await buscarPorTermo(termo, usuario.id));
   } catch (error) {
     return handleRouteError(error);
   }

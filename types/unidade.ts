@@ -7,6 +7,9 @@ export interface IUnidade {
   sigla: string;
   criadoEm: Date;
   atualizadoEm: Date;
+  // Presente só nas unidades de processo (UnidadeGrupo) — undefined nas do
+  // catálogo global (Unidade, usado no cadastro de usuário).
+  grupo_id?: string;
 }
 
 export interface ICreateUnidade {

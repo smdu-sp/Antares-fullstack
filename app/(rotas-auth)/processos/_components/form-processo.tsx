@@ -36,7 +36,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import * as processo from "@/services/processos";
 import * as usuario from "@/services/usuarios";
-import { listarAutocomplete as listarUnidadesAutocomplete } from "@/services/unidades";
+// Unidade remetente/destino do processo usa UnidadeGrupo (por grupo), não o
+// catálogo global (usado só no cadastro de usuário).
+import { listarAutocomplete as listarUnidadesAutocomplete } from "@/services/unidades-grupo";
 import * as interessado from "@/services/interessados";
 import { useTransition, useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
