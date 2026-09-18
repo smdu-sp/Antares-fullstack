@@ -12,7 +12,7 @@ import ModalProcesso from "@/app/(rotas-auth)/processos/_components/modal-proces
 import ModalDeleteProcesso from "@/app/(rotas-auth)/processos/_components/modal-delete-processo";
 import {
   getUltimoAndamento,
-  calcularDiasRestantes,
+  diasRestantesDoAndamento,
   getStatusPrazo,
   formatarData,
 } from "@/app/(rotas-auth)/processos/_components/utils";
@@ -35,12 +35,7 @@ export default function ProcessoDetalhesHeader({
   const [isSavingAssunto, setIsSavingAssunto] = useState(false);
 
   const ultimoAndamento = getUltimoAndamento(processoProp.andamentos);
-  const diasRestantes = ultimoAndamento
-    ? calcularDiasRestantes(
-        new Date(ultimoAndamento.prazo),
-        ultimoAndamento.prorrogacao,
-      )
-    : null;
+  const diasRestantes = diasRestantesDoAndamento(ultimoAndamento);
   const statusPrazo =
     ultimoAndamento && diasRestantes !== null
       ? getStatusPrazo(diasRestantes, ultimoAndamento.status)

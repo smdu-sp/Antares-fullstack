@@ -286,7 +286,10 @@ function AndamentosDetail({
     }
 
     loadAndamentos();
-  }, [processo.id, session?.access_token, session?.grupoAtivo?.id, loaded, unidades]);
+    // `unidades` não entra aqui de propósito: não é usada dentro do carregamento
+    // e, por ser um array novo a cada revalidação do servidor, só serviria pra
+    // re-disparar o efeito à toa.
+  }, [processo.id, session?.access_token, session?.grupoAtivo?.id, loaded]);
 
   const adicionarAndamento = () => {
     const novoAndamento: any = {
@@ -574,6 +577,10 @@ function AndamentosDetail({
             field === "data_resposta"
               ? event.newValue
               : andamentoAtualizado.data_resposta,
+          data_chegada:
+            field === "data_chegada"
+              ? event.newValue
+              : andamentoAtualizado.data_chegada,
           data_final:
             field === "data_final"
               ? event.newValue
@@ -608,6 +615,8 @@ function AndamentosDetail({
           dataToSave.prorrogacao = convertDateField(dataToSave.prorrogacao);
         if (dataToSave.resposta)
           dataToSave.resposta = convertDateField(dataToSave.resposta);
+        if (dataToSave.data_chegada)
+          dataToSave.data_chegada = convertDateField(dataToSave.data_chegada);
         if (dataToSave.data_final)
           dataToSave.data_final = convertDateField(dataToSave.data_final);
 
@@ -671,6 +680,10 @@ function AndamentosDetail({
                     dataToSave.resposta !== undefined
                       ? dataToSave.resposta
                       : a.data_resposta,
+                  data_chegada:
+                    dataToSave.data_chegada !== undefined
+                      ? dataToSave.data_chegada
+                      : a.data_chegada,
                   data_final:
                     dataToSave.data_final !== undefined
                       ? dataToSave.data_final
@@ -740,6 +753,26 @@ function AndamentosDetail({
           return true;
         },
         width: 200,
+      },
+      {
+        field: "data_chegada",
+        headerName: "Data Chegada",
+        editable: true,
+        cellEditor: DateCellEditor,
+        valueGetter: (params) => {
+          return parseUTCDate(params.data?.data_chegada);
+        },
+        valueSetter: (params) => {
+          params.data.data_chegada = params.newValue
+            ? params.newValue.toISOString()
+            : null;
+          return true;
+        },
+        valueFormatter: (params) => {
+          if (!params.value) return "";
+          return format(params.value, "dd/MM/yyyy", { locale: ptBR });
+        },
+        width: 140,
       },
       {
         field: "data_envio",
@@ -1168,6 +1201,9 @@ function AndamentosDetail({
         <AgGridReact
           ref={gridRef}
           rowData={andamentos}
+          // Sem getRowId, todo setAndamentos recria as linhas do zero (piscando);
+          // com ele o AG-Grid só atualiza/insere/remove o que de fato mudou.
+          getRowId={(params) => params.data.id}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
           onCellValueChanged={onCellValueChanged}
@@ -1181,6 +1217,10 @@ function AndamentosDetail({
             unidades: unidades,
             interessados: interessados,
           }}
+          // Sem isso, enquanto os andamentos ainda estão sendo buscados a grid já
+          // aparece com "Nenhum andamento cadastrado" (rowData começa vazio).
+          loading={loading}
+          localeText={{ loadingOoo: "Carregando andamentos..." }}
           overlayNoRowsTemplate="Nenhum andamento cadastrado"
         />
       </div>
@@ -1370,6 +1410,17 @@ export default function ProcessosSpreadsheet({
   useEffect(() => {
     interessadosRef.current = interessados;
   }, [interessados]);
+
+  // `unidades` chega como array novo a cada revalidação do servidor (criar/
+  // atualizar andamento dispara revalidateTag). Se o fullWidthCellRenderer
+  // dependesse dele direto, o AG-Grid recriava o renderer de TODAS as linhas
+  // expandidas — o AndamentosDetail remontava, perdia o estado e refazia o
+  // fetch, e os andamentos "piscavam" (somem e reaparecem). Por isso o
+  // renderer lê via ref e fica estável.
+  const unidadesRef = useRef<IUnidade[]>(unidades);
+  useEffect(() => {
+    unidadesRef.current = unidades;
+  }, [unidades]);
 
   // Criar dados da linha incluindo linhas de detalhe
   const rowData = useMemo(() => {
@@ -2620,12 +2671,12 @@ export default function ProcessosSpreadsheet({
         <AndamentosDetail
           key={data._processo.id}
           processo={data._processo as IProcesso}
-          unidades={unidades}
+          unidades={unidadesRef.current}
           interessados={interessadosRef.current}
         />
       </div>
     );
-  }, [unidades]);
+  }, []);
 
   const getRowHeight = useCallback((params: any) => {
     const data = params.node?.data || params.data;

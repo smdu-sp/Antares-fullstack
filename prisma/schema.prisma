@@ -194,9 +194,8 @@ model processo {
   // ProcessosService.buscarTudo usa nos filtros vencendoHoje/atrasados/concluidos, só que
   // pré-computados: a consulta original precisava de uma subquery correlacionada em
   // `andamentos` por processo candidato, o que não escalava (5+s com dezenas de milhares
-  // de linhas). `prazo_efetivo` = menor (prorrogacao ?? prazo) entre os andamentos ativos
-  // com status EM_ANDAMENTO/PRORROGADO; fica nulo se algum andamento ativo está CONCLUIDO
-  // (mesma regra de desqualificação do filtro original) ou se não há prazo em aberto.
+  // de linhas). `prazo_efetivo` = (prorrogacao ?? prazo) do andamento ativo MAIS RECENTE;
+  // fica nulo se ele está CONCLUIDO ou sem prazo (ver recalcular-prazo-efetivo.ts).
   prazo_efetivo               DateTime?
   andamentos_todos_concluidos Boolean    @default(false)
 
@@ -224,6 +223,7 @@ model andamento {
   prazo                  DateTime? // Data limite para retorno do processo à unidade de origem - DateTime (opcional) - Valor padrão: null - Pode ser preenchida na criação ou posteriormente - Data até a qual o processo deve ser retornado. Se não retornado até esta data, está em atraso
   prorrogacao            DateTime? // Nova data limite caso o processo tenha sido prorrogado - DateTime (opcional) - Se preenchido, indica que o prazo foi prorrogado e esta é a nova data limite - Observação: Quando preenchido, o status deve ser alterado para PRORROGADO
   resposta               DateTime? // Data em que o processo recebeu resposta e foi retornado à unidade de origem - DateTime (opcional) - Data em que o processo foi finalizado e devolvido. Se preenchido, o status deve ser CONCLUIDO
+  data_chegada           DateTime? // Data de chegada do processo ao destino - DateTime (opcional) - Campo livre, independente de `data_envio`/`resposta`/status - preenchido manualmente pelo usuário
   data_final             DateTime? // Data final do andamento - DateTime (opcional) - Campo livre, independente de `resposta`/status - preenchido manualmente pelo usuário
   status                 StatusAndamento @default(EM_ANDAMENTO) // Status atual do andamento - Enum (StatusAndamento) - Valor padrão: EM_ANDAMENTO - Valores: EM_ANDAMENTO (em tramitação), CONCLUIDO (concluído e retornado), PRORROGADO (prazo prorrogado)
   observacao             String? // Observações sobre o andamento - String (opcional) - Campo livre para anotações, justificativas de prorrogação, ou outras informações relevantes

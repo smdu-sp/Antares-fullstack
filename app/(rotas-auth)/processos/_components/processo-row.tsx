@@ -12,7 +12,7 @@ import ModalProcesso from "./modal-processo";
 import ModalDeleteProcesso from "./modal-delete-processo";
 import {
   getUltimoAndamento,
-  calcularDiasRestantes,
+  diasRestantesDoAndamento,
   getStatusPrazo,
   formatarData,
 } from "./utils";
@@ -24,12 +24,7 @@ export default function ProcessoRow({ processo }: { processo: IProcesso }) {
   const refreshAndamentosRef = useRef<(() => void) | null>(null);
 
   const ultimoAndamento = getUltimoAndamento(processo.andamentos);
-  const diasRestantes = ultimoAndamento
-    ? calcularDiasRestantes(
-        new Date(ultimoAndamento.prazo),
-        ultimoAndamento.prorrogacao,
-      )
-    : null;
+  const diasRestantes = diasRestantesDoAndamento(ultimoAndamento);
   const statusPrazo =
     ultimoAndamento && diasRestantes !== null
       ? getStatusPrazo(diasRestantes, ultimoAndamento.status)

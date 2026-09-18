@@ -16,6 +16,7 @@ export async function criar(dados: CreateAndamentoInput, usuario_id: string) {
 
   const prazo = dados.prazo ? new Date(dados.prazo) : null;
   const data_envio = dados.data_envio ? new Date(dados.data_envio) : null;
+  const data_chegada = dados.data_chegada ? new Date(dados.data_chegada) : null;
   const data_final = dados.data_final ? new Date(dados.data_final) : null;
 
   const andamento = await prisma.andamento.create({
@@ -25,6 +26,7 @@ export async function criar(dados: CreateAndamentoInput, usuario_id: string) {
       destino: dados.destino,
       data_envio,
       prazo,
+      data_chegada,
       data_final,
       status: dados.status || StatusAndamento.EM_ANDAMENTO,
       observacao: dados.observacao,

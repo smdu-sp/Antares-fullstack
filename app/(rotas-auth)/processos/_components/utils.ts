@@ -25,7 +25,7 @@ export function formatarData(
 
 // Função para calcular dias restantes (considera apenas a data, sem hora)
 export function calcularDiasRestantes(
-	prazo: Date | string,
+	prazo: Date | string | null | undefined,
 	prorrogacao?: Date | string | null,
 ): number {
 	const raw = prorrogacao ? prorrogacao : prazo;
@@ -81,60 +81,26 @@ export function getStatusPrazo(
 	};
 }
 
-// Função para obter o andamento mais crítico (prioriza vencidos e prestes a vencer)
+// Andamento em evidência do processo: o MAIS RECENTE (por data de criação),
+// independente do status. Antes era o "mais crítico" (o mais atrasado), o que
+// na prática fazia o andamento mais antigo ficar sempre em destaque.
 export function getUltimoAndamento(
 	andamentos?: IAndamento[],
 ): IAndamento | null {
 	if (!andamentos || andamentos.length === 0) return null;
-	
-	// Filtra apenas andamentos não concluídos
-	const ativos = andamentos.filter((a) => a.status !== StatusAndamento.CONCLUIDO);
-	
-	// Se não houver ativos, retorna o último concluído
-	if (ativos.length === 0) {
-		const concluidos = andamentos
-			.filter((a) => a.status === StatusAndamento.CONCLUIDO)
-			.sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
-		return concluidos[0] || null;
-	}
-	
-	// Calcula dias restantes para cada andamento e ordena por prioridade
-	const andamentosComPrioridade = ativos.map((a) => {
-		const dias = calcularDiasRestantes(
-			new Date(a.prazo),
-			a.prorrogacao,
-		);
-		return { andamento: a, dias };
-	});
-	
-	// Ordena por prioridade:
-	// 1. Vencidos (dias < 0) - mais negativo primeiro (mais atrasado)
-	// 2. Vencendo hoje (dias = 0)
-	// 3. Próximos a vencer (dias <= 3) - menos dias primeiro
-	// 4. Demais (dias > 3) - menos dias primeiro
-	andamentosComPrioridade.sort((a, b) => {
-		// Se ambos estão vencidos, prioriza o mais atrasado
-		if (a.dias < 0 && b.dias < 0) {
-			return a.dias - b.dias; // Mais negativo primeiro
-		}
-		// Se apenas A está vencido
-		if (a.dias < 0) return -1;
-		// Se apenas B está vencido
-		if (b.dias < 0) return 1;
-		
-		// Se ambos estão vencendo hoje ou próximos (dias <= 3)
-		if (a.dias <= 3 && b.dias <= 3) {
-			return a.dias - b.dias; // Menos dias primeiro
-		}
-		// Se apenas A está vencendo hoje/próximo
-		if (a.dias <= 3) return -1;
-		// Se apenas B está vencendo hoje/próximo
-		if (b.dias <= 3) return 1;
-		
-		// Ambos têm mais de 3 dias, ordena por menos dias primeiro
-		return a.dias - b.dias;
-	});
-	
-	return andamentosComPrioridade[0]?.andamento || null;
+
+	return andamentos.reduce((maisRecente, atual) =>
+		new Date(atual.criadoEm).getTime() > new Date(maisRecente.criadoEm).getTime()
+			? atual
+			: maisRecente,
+	);
+}
+
+// Dias restantes do andamento em evidência, ou null se ele não tem prazo
+// nem prorrogação (prazo é opcional — new Date(null) viraria 1970 e o
+// andamento apareceria com ~20 mil dias "em atraso").
+export function diasRestantesDoAndamento(andamento: IAndamento | null): number | null {
+	if (!andamento || (!andamento.prazo && !andamento.prorrogacao)) return null;
+	return calcularDiasRestantes(andamento.prazo, andamento.prorrogacao);
 }
 
