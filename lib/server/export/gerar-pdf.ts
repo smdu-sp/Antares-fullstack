@@ -76,12 +76,6 @@ function addProcessoToPDF(
     { label: 'Origem', value: processo.origem },
     { label: 'Interessado', value: processo.interessado?.valor || 'Não informado' },
     {
-      label: 'Unidade Remetente',
-      value: processo.unidadeRemetente
-        ? `${processo.unidadeRemetente.sigla} - ${processo.unidadeRemetente.nome}`
-        : 'Não informada',
-    },
-    {
       label: 'Unidade Destino',
       value: processo.unidadeDestino
         ? `${processo.unidadeDestino.sigla} - ${processo.unidadeDestino.nome}`

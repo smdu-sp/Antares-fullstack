@@ -12,7 +12,7 @@ export async function buscarPorId(
   const baseURL = getInternalApiUrl();
   try {
     const processo = await fetch(
-      `${baseURL}processos/${id}?include=unidadeInteressada,unidadeRemetente`,
+      `${baseURL}processos/${id}?include=unidadeInteressada`,
       {
         method: "GET",
         headers: buildAuthHeaders(access_token, grupoAtivoId),

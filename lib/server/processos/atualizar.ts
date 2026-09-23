@@ -41,7 +41,6 @@ export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_
   }
 
   let interessadoId: string | null = null;
-  let unidadeRemetenteId: string | null = null;
   let unidadeDestinoId: string | null = null;
 
   if (dados.interessado_id) {
@@ -56,20 +55,6 @@ export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_
 
   if (dados.interessado && dados.interessado.trim() !== '') {
     interessadoId = await resolverInteressadoPorTexto(dados.interessado, processoExistente.grupo_id);
-  }
-
-  if (dados.unidade_remetente_id) {
-    // Escopado ao grupo do processo — unidade remetente/destino é por-grupo
-    // (UnidadeGrupo, não o catálogo global Unidade — ver schema.prisma).
-    const unidadeExistente = await prisma.unidadeGrupo.findUnique({
-      where: { id: dados.unidade_remetente_id, grupo_id: processoExistente.grupo_id },
-    });
-    if (!unidadeExistente) throw new HttpError(400, 'Unidade remetente não encontrada.');
-    unidadeRemetenteId = dados.unidade_remetente_id;
-  }
-
-  if (dados.unidade_remetente && dados.unidade_remetente.trim() !== '') {
-    unidadeRemetenteId = await resolverUnidadeGrupoPorTexto(dados.unidade_remetente, processoExistente.grupo_id);
   }
 
   if (dados.unidade_destino_id) {
@@ -98,9 +83,6 @@ export async function atualizar(id: string, dados: UpdateProcessoInput, usuario_
 
   if (interessadoId !== null) {
     dadosAtualizacao.interessado_id = interessadoId;
-  }
-  if (unidadeRemetenteId !== null) {
-    dadosAtualizacao.unidade_remetente_id = unidadeRemetenteId;
   }
   if (unidadeDestinoId !== null) {
     dadosAtualizacao.unidade_destino_id = unidadeDestinoId;

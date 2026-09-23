@@ -11,7 +11,6 @@ export async function buscarTudo(
   limiteInput?: number,
   busca?: string,
   interessado?: string,
-  unidadeRemetente?: string,
   unidadeDestino?: string,
   vencendoHoje: boolean = false,
   atrasados: boolean = false,
@@ -42,7 +41,6 @@ export async function buscarTudo(
       { resposta_final: { contains: busca } },
       { unidade_respondida_id: { contains: busca } },
       { interessado: { valor: { contains: busca } } },
-      { unidadeRemetente: { OR: [{ nome: { contains: busca } }, { sigla: { contains: busca } }] } },
       { unidadeDestino: { OR: [{ nome: { contains: busca } }, { sigla: { contains: busca } }] } },
       {
         andamentos: {
@@ -63,12 +61,6 @@ export async function buscarTudo(
     searchParams.interessado = { valor: { contains: interessado } };
   }
 
-  if (unidadeRemetente) {
-    searchParams.unidadeRemetente = {
-      OR: [{ nome: { contains: unidadeRemetente } }, { sigla: { contains: unidadeRemetente } }],
-    };
-  }
-
   if (unidadeDestino) {
     searchParams.unidadeDestino = {
       OR: [{ nome: { contains: unidadeDestino } }, { sigla: { contains: unidadeDestino } }],
@@ -84,10 +76,7 @@ export async function buscarTudo(
     searchParams.AND = [
       ...andAtual,
       {
-        OR: [
-          { unidadeRemetente: { OR: [{ nome: { contains: unidade } }, { sigla: { contains: unidade } }] } },
-          { unidadeDestino: { OR: [{ nome: { contains: unidade } }, { sigla: { contains: unidade } }] } },
-        ],
+        unidadeDestino: { OR: [{ nome: { contains: unidade } }, { sigla: { contains: unidade } }] },
       },
     ];
   }
@@ -111,7 +100,14 @@ export async function buscarTudo(
     }
 
     if (concluidos) {
-      filtrosStatus.push({ andamentos_todos_concluidos: true });
+      // Mesma regra usada pro destaque visual da linha na grid (ver
+      // isProcessoConcluido em components/processos-spreadsheet.tsx): tem
+      // resposta final registrada, seja como data ou como texto. Antes usava
+      // `andamentos_todos_concluidos` (TODOS os andamentos individualmente
+      // marcados como status CONCLUIDO) — um conceito diferente, que fazia
+      // processos com resposta final registrada mas algum andamento aberto
+      // (ou vice-versa) sumirem ou aparecerem errado nesse filtro.
+      filtrosStatus.push({ OR: [{ data_resposta_final: { not: null } }, { resposta_final: { not: null } }] });
     }
 
     if (filtrosStatus.length > 0) {

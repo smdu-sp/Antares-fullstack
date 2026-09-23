@@ -48,18 +48,6 @@ export async function criar(dados: CreateProcessoInput, usuario_id: string) {
     interessadoId = await resolverInteressadoPorTexto(dados.interessado, grupoAtivoId);
   }
 
-  let unidadeRemetenteId = dados.unidade_remetente_id || null;
-  if (unidadeRemetenteId) {
-    // Unidade remetente/destino de processo é UnidadeGrupo (por grupo), não
-    // o catálogo global Unidade (usado só no cadastro de usuário).
-    const unidadeRemetente = await prisma.unidadeGrupo.findUnique({
-      where: { id: unidadeRemetenteId, grupo_id: grupoAtivoId },
-    });
-    if (!unidadeRemetente) throw new HttpError(400, 'Unidade remetente não encontrada.');
-  } else if (dados.unidade_remetente && dados.unidade_remetente.trim() !== '') {
-    unidadeRemetenteId = await resolverUnidadeGrupoPorTexto(dados.unidade_remetente, grupoAtivoId);
-  }
-
   let unidadeDestinoId = dados.unidade_destino_id || null;
   if (unidadeDestinoId) {
     const unidadeDestino = await prisma.unidadeGrupo.findUnique({
@@ -84,7 +72,6 @@ export async function criar(dados: CreateProcessoInput, usuario_id: string) {
       assunto: dados.assunto || 'Assunto a ser definido',
       origem: dados.origem || 'EXPEDIENTE',
       interessado_id: interessadoId,
-      unidade_remetente_id: unidadeRemetenteId,
       unidade_destino_id: unidadeDestinoId,
       data_recebimento: dados.data_recebimento ? new Date(dados.data_recebimento) : undefined,
       data_envio_unidade: dados.data_envio_unidade ? new Date(dados.data_envio_unidade) : undefined,

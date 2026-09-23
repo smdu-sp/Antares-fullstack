@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
     const limite = Number(searchParams.get('limite')) || undefined;
     const busca = searchParams.get('busca') || undefined;
     const interessado = searchParams.get('interessado') || undefined;
-    const unidadeRemetente = searchParams.get('unidadeRemetente') || undefined;
     const unidadeDestino = searchParams.get('unidadeDestino') || undefined;
     const unidade = searchParams.get('unidade') || undefined;
     const vencendoHoje = searchParams.get('vencendoHoje') === 'true';
@@ -51,7 +50,6 @@ export async function GET(request: NextRequest) {
       limite,
       busca,
       interessado,
-      unidadeRemetente,
       unidadeDestino,
       vencendoHoje,
       atrasados,

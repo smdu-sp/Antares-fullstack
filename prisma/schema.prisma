@@ -120,7 +120,6 @@ model UnidadeGrupo {
   grupo_id     String
   grupo        Grupo    @relation(fields: [grupo_id], references: [id])
 
-  processosRemetentes    processo[] @relation("UnidadeGrupoRemetente") // Processos onde esta unidade é a remetente
   processosDestinatarios processo[] @relation("UnidadeGrupoDestino") // Processos onde esta unidade é a destinatária
 
   @@unique([nome, grupo_id])
@@ -164,11 +163,9 @@ model processo {
   id                      String      @id @default(uuid()) // ID único do processo (UUID gerado automaticamente) - Chave primária
   numero_sei              String      // Número SEI (Sistema Eletrônico de Informações) do processo - String - Obrigatório - Único POR GRUPO (ver @@unique abaixo), não mais no sistema inteiro: cada grupo pode ter sua própria cópia independente do mesmo número SEI (ver vínculo automático em criar.ts) - Exemplo: "1234567"
   assunto                 String      @db.Text // Assunto do processo - TEXT - Obrigatório - Descrição detalhada do que trata o processo - Suporta textos longos até 65.535 caracteres - Exemplo: "Solicitação de licença para obra com descrição detalhada dos requisitos técnicos, localização, impacto ambiental e documentação necessária"
-  origem                  String      @default("EXPEDIENTE") // Unidade de origem do processo - String - Obrigatório - Unidade que originou/solicitou o processo - Exemplo: "EXPEDIENTE", "COORDENADORIA_JURIDICA" - Valor padrão: EXPEDIENTE
+  origem                  String      @default("EXPEDIENTE") // Unidade REMETENTE do processo (rótulo na UI é "Unidade Remetente") - String - Obrigatório - Texto livre - Exemplo: "EXPEDIENTE", "COORDENADORIA_JURIDICA" - Valor padrão: EXPEDIENTE. Substituiu `unidade_remetente_id`/`unidadeRemetente` (FK pra UnidadeGrupo, removido por não estar em uso — só esse campo texto era preenchido na prática).
   interessado_id          String? // ID do interessado (chave estrangeira) - String (UUID) - Opcional - Referência ao interessado do processo
   interessado             Interessado? @relation(fields: [interessado_id], references: [id]) // Relacionamento com o modelo Interessado - Interessado do processo
-  unidade_remetente_id    String? // ID da unidade remetente (chave estrangeira) - String (UUID) - Opcional - Referência à UnidadeGrupo (por grupo) que está remetendo o processo
-  unidadeRemetente        UnidadeGrupo? @relation("UnidadeGrupoRemetente", fields: [unidade_remetente_id], references: [id]) // Relacionamento com o modelo UnidadeGrupo - Unidade remetente do processo
   unidade_destino_id      String? // ID da unidade destinatária (chave estrangeira) - String (UUID) - Opcional - Referência à UnidadeGrupo (por grupo) que é a destinatária do processo
   unidadeDestino          UnidadeGrupo? @relation("UnidadeGrupoDestino", fields: [unidade_destino_id], references: [id]) // Relacionamento com o modelo UnidadeGrupo - Unidade destinatária do processo
   prazo                   DateTime? // Prazo limite para conclusão do processo - DateTime (opcional) - Exemplo: "2025-12-31T00:00:00.000Z"

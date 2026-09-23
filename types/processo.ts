@@ -52,9 +52,6 @@ export interface IProcesso {
   interessado?: string;
   interessado_id?: string;
   unidadeInteressada?: { id: string; nome: string; sigla: string };
-  unidade_remetente?: string;
-  unidade_remetente_id?: string;
-  unidadeRemetente?: { id: string; nome: string; sigla: string };
   unidade_destino?: string;
   unidade_destino_id?: string;
   unidadeDestino?: { id: string; nome: string; sigla: string };
@@ -77,7 +74,6 @@ export interface ICreateProcesso {
   numero_sei: string;
   assunto: string;
   unidade_interessada_id?: string;
-  unidade_remetente_id?: string;
   unidade_destino_id?: string;
   origem: string;
   data_recebimento: string;
@@ -90,7 +86,6 @@ export interface IUpdateProcesso {
   assunto?: string;
   interessado_id?: string | null;
   unidade_interessada_id?: string;
-  unidade_remetente_id?: string;
   unidade_destino_id?: string;
   origem?: string;
   data_recebimento?: string;

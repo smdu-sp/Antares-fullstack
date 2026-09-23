@@ -10,7 +10,11 @@ export async function contarConcluidos(usuario_id?: string): Promise<number> {
   const searchParams: Prisma.processoWhereInput = {
     ...(visibilidade.filtros.length > 0 ? { AND: [...visibilidade.filtros] } : {}),
     ativo: true,
-    data_resposta_final: { not: null },
+    // Mesma regra do filtro "concluidos" em buscar-tudo.ts (e do destaque
+    // visual da grid, isProcessoConcluido) — tem resposta final registrada,
+    // como data ou como texto. Sem o `resposta_final`, essa contagem (badge
+    // do botão "Concluídos") não batia com o resultado do filtro.
+    OR: [{ data_resposta_final: { not: null } }, { resposta_final: { not: null } }],
   };
 
   return prisma.processo.count({ where: searchParams });

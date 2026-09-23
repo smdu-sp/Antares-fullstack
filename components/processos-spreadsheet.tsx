@@ -292,8 +292,14 @@ function AndamentosDetail({
   }, [processo.id, session?.access_token, session?.grupoAtivo?.id, loaded]);
 
   const adicionarAndamento = () => {
+    const tempId = `temp-${Date.now()}`;
     const novoAndamento: any = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
+      // Chave estável que sobrevive à troca do `id` temp->real (ver getRowId
+      // logo abaixo, na AgGridReact) — sem isso o AG-Grid trata a criação
+      // bem-sucedida como "remover linha temp + inserir linha nova", causando
+      // o piscar reportado (linha some e reaparece na posição errada).
+      _rowKey: tempId,
       processo_id: processo.id,
       origem: "",
       destino: "",
@@ -305,7 +311,7 @@ function AndamentosDetail({
       observacao: "",
       _isNew: true,
     };
-    setAndamentos([...andamentos, novoAndamento]);
+    setAndamentos((prev) => [...prev, novoAndamento]);
   };
 
   // Duplica só os campos descritivos (origem/destino/assunto/observação) —
@@ -330,7 +336,8 @@ function AndamentosDetail({
 
       const response = await andamento.server.criar(dataToCreate as any);
       if (response.ok && response.data) {
-        setAndamentos([response.data as IAndamento, ...andamentos]);
+        const andamentoCriado = response.data as IAndamento;
+        setAndamentos((prev) => [andamentoCriado, ...prev]);
         toast.success("Andamento duplicado");
       } else {
         toast.error("Erro ao duplicar andamento", {
@@ -338,7 +345,7 @@ function AndamentosDetail({
         });
       }
     },
-    [session?.access_token, processo.id, andamentos],
+    [session?.access_token, processo.id],
   );
 
   const handleSaveAssunto = async () => {
@@ -652,12 +659,17 @@ function AndamentosDetail({
               // Garantir que origem e destino não sejam perdidos
               origem: response.data.origem || dataToSave.origem,
               destino: response.data.destino || dataToSave.destino,
+              // Preserva a chave estável da linha temp (ver getRowId) — o id
+              // muda de temp-X pro UUID real, mas a identidade da linha na
+              // grid não pode mudar, senão o AG-Grid recria a linha do zero.
+              _rowKey: (andamentoAtualizado as any)._rowKey ?? andamentoAtualizado.id,
             };
             // Atualizar com o ID real do servidor
-            const updatedAndamentos = andamentos.map((a) =>
-              (a as any).id === andamentoAtualizado.id ? responseData : a,
+            setAndamentos((prev) =>
+              prev.map((a) =>
+                (a as any).id === andamentoAtualizado.id ? (responseData as IAndamento) : a,
+              ),
             );
-            setAndamentos(updatedAndamentos as IAndamento[]);
             toast.success("Andamento criado com sucesso");
           }
         } else {
@@ -671,28 +683,29 @@ function AndamentosDetail({
             // (o nome do campo na grid/IAndamento) — comparar contra o nome
             // errado fazia essa cláusula nunca disparar, então a edição só
             // aparecia na grid depois de recarregar a página.
-            const updatedAndamentos = andamentos.map((a) => {
-              if (a.id === andamentoAtualizado.id) {
-                return {
-                  ...a,
-                  status: dataToSave.status || a.status,
-                  data_resposta:
-                    dataToSave.resposta !== undefined
-                      ? dataToSave.resposta
-                      : a.data_resposta,
-                  data_chegada:
-                    dataToSave.data_chegada !== undefined
-                      ? dataToSave.data_chegada
-                      : a.data_chegada,
-                  data_final:
-                    dataToSave.data_final !== undefined
-                      ? dataToSave.data_final
-                      : a.data_final,
-                };
-              }
-              return a;
-            });
-            setAndamentos(updatedAndamentos);
+            setAndamentos((prev) =>
+              prev.map((a) => {
+                if (a.id === andamentoAtualizado.id) {
+                  return {
+                    ...a,
+                    status: dataToSave.status || a.status,
+                    data_resposta:
+                      dataToSave.resposta !== undefined
+                        ? dataToSave.resposta
+                        : a.data_resposta,
+                    data_chegada:
+                      dataToSave.data_chegada !== undefined
+                        ? dataToSave.data_chegada
+                        : a.data_chegada,
+                    data_final:
+                      dataToSave.data_final !== undefined
+                        ? dataToSave.data_final
+                        : a.data_final,
+                  };
+                }
+                return a;
+              }),
+            );
             toast.success("Andamento atualizado com sucesso");
           }
         }
@@ -717,21 +730,11 @@ function AndamentosDetail({
         savingRef.current.delete(andamentoAtualizado.id);
       }
     },
-    [session?.access_token, processo.id, andamentos],
+    [session?.access_token, processo.id],
   );
 
   const columnDefs = useMemo<ColDef[]>(
     () => [
-      {
-        field: "origem",
-        headerName: "Origem",
-        editable: true,
-        valueSetter: (params) => {
-          params.data.origem = params.newValue;
-          return true;
-        },
-        width: 200,
-      },
       {
         field: "assunto",
         headerName: "Assunto",
@@ -743,6 +746,16 @@ function AndamentosDetail({
           params.data.assunto = params.newValue || null;
           return true;
         },
+      },
+      {
+        field: "origem",
+        headerName: "Origem",
+        editable: true,
+        valueSetter: (params) => {
+          params.data.origem = params.newValue;
+          return true;
+        },
+        width: 200,
       },
       {
         field: "destino",
@@ -865,6 +878,14 @@ function AndamentosDetail({
         width: 130,
       },
       {
+        field: "observacao",
+        headerName: "Observação",
+        editable: true,
+        width: 250,
+        wrapText: true,
+        autoHeight: true,
+      },
+      {
         field: "status",
         headerName: "Status",
         editable: true,
@@ -915,14 +936,6 @@ function AndamentosDetail({
         width: 150,
       },
       {
-        field: "observacao",
-        headerName: "Observação",
-        editable: true,
-        width: 250,
-        wrapText: true,
-        autoHeight: true,
-      },
-      {
         headerName: "Ações",
         field: "acoes",
         width: 150,
@@ -934,10 +947,7 @@ function AndamentosDetail({
           const ehNovo = (andamentoData as any)._isNew === true;
 
           const handleSuccess = () => {
-            const updatedAndamentos = andamentos.filter(
-              (a) => a.id !== andamentoData.id,
-            );
-            setAndamentos(updatedAndamentos);
+            setAndamentos((prev) => prev.filter((a) => a.id !== andamentoData.id));
           };
 
           return (
@@ -965,7 +975,7 @@ function AndamentosDetail({
         },
       },
     ],
-    [andamentos, duplicarAndamento],
+    [duplicarAndamento],
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -1203,7 +1213,9 @@ function AndamentosDetail({
           rowData={andamentos}
           // Sem getRowId, todo setAndamentos recria as linhas do zero (piscando);
           // com ele o AG-Grid só atualiza/insere/remove o que de fato mudou.
-          getRowId={(params) => params.data.id}
+          // `_rowKey` (quando presente) é a chave estável que sobrevive à
+          // troca do `id` temp->real na criação — ver adicionarAndamento.
+          getRowId={(params) => params.data._rowKey ?? params.data.id}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
           onCellValueChanged={onCellValueChanged}
@@ -1583,8 +1595,12 @@ export default function ProcessosSpreadsheet({
   };
 
   const adicionarProcesso = () => {
+    const tempId = `temp-${Date.now()}`;
     const novoProcesso: any = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
+      // Chave estável que sobrevive à troca do `id` temp->real na criação —
+      // ver getRowId (evita o AG-Grid tratar a criação como remover+inserir).
+      _rowKey: tempId,
       numero_sei: "",
       assunto: "",
       interessado: "",
@@ -1601,7 +1617,7 @@ export default function ProcessosSpreadsheet({
       novoProcesso.usuario_atribuido_id = "";
     }
 
-    setProcessosLocal([novoProcesso, ...processosLocal]);
+    setProcessosLocal((prev) => [novoProcesso, ...prev]);
   };
 
   const compareDateValues = useCallback((valueA: unknown, valueB: unknown) => {
@@ -1743,7 +1759,7 @@ export default function ProcessosSpreadsheet({
         },
         {
           field: "origem",
-          headerName: "Origem",
+          headerName: "Unidade Remetente",
           editable: true,
           valueGetter: (params: any) => {
             if (params.data?._isDetail) return "";
@@ -1865,43 +1881,6 @@ export default function ProcessosSpreadsheet({
               },
             ]
           : []),
-        {
-          field: "unidadeRemetente",
-          headerName: "Unidade Remetente",
-          editable: true,
-          valueGetter: (params: any) => {
-            if (params.data?._isDetail) return "";
-            const processo = params.data as IProcesso;
-            if (processo.unidadeRemetente) {
-              return `${processo.unidadeRemetente.sigla} - ${processo.unidadeRemetente.nome}`;
-            }
-            return "";
-          },
-          valueFormatter: (params: any) => params.value || "",
-          valueSetter: (params: ValueSetterParams) => {
-            // Texto livre, sem sugestão: tenta achar um match local por
-            // sigla/nome (aceita ainda o formato antigo "SIGLA - Nome"); sem
-            // match, guarda como pendente — o backend acha ou cria (mesmo
-            // padrão já usado em "interessado" logo acima).
-            const texto = ((params.newValue as string) || "").trim();
-            if (!texto) return false;
-
-            const siglaDigitada = texto.includes(" - ")
-              ? texto.split(" - ")[0].trim()
-              : texto;
-            const unidade = unidades.find(
-              (u) => u.sigla === siglaDigitada || u.sigla === texto || u.nome === texto,
-            );
-
-            params.data.unidadeRemetente = unidade || {
-              id: `temp-${Date.now()}`,
-              sigla: "",
-              nome: texto,
-            };
-            return true;
-          },
-          width: 200,
-        },
         {
           field: "unidadeDestino",
           headerName: "Unidade Destinatária",
@@ -2292,15 +2271,6 @@ export default function ProcessosSpreadsheet({
             dataToCreate.interessado_id = processoAtualizado.interessado_id;
           }
 
-          if (ehTemp(processoAtualizado.unidadeRemetente?.id)) {
-            if (processoAtualizado.unidadeRemetente?.nome) {
-              dataToCreate.unidade_remetente =
-                processoAtualizado.unidadeRemetente.nome;
-            }
-          } else if (processoAtualizado.unidadeRemetente?.id) {
-            dataToCreate.unidade_remetente_id =
-              processoAtualizado.unidadeRemetente.id;
-          }
           // unidade_destino não vai na criação — só na atualização logo
           // abaixo, depois que o processo já existe (ver bloco após criar()).
           if (processoAtualizado.prazo) {
@@ -2319,6 +2289,11 @@ export default function ProcessosSpreadsheet({
           if (response.ok && response.data) {
             // Atualizar com o processo real do servidor
             const createdProcesso = response.data as IProcesso;
+            // Preserva a chave estável da linha temp (ver getRowId) — o id
+            // muda de temp-X pro UUID real, mas a identidade da linha na
+            // grid não pode mudar, senão o AG-Grid recria a linha do zero.
+            (createdProcesso as any)._rowKey =
+              (processoAtualizado as any)._rowKey ?? processoAtualizado.id;
             if (processoAtualizado.unidadeDestino) {
               createdProcesso.unidadeDestino =
                 processoAtualizado.unidadeDestino;
@@ -2351,10 +2326,9 @@ export default function ProcessosSpreadsheet({
               }
             }
 
-            const updatedProcessos = processosLocal.map((p) =>
-              p.id === processoAtualizado.id ? createdProcesso : p,
+            setProcessosLocal((prev) =>
+              prev.map((p) => (p.id === processoAtualizado.id ? createdProcesso : p)),
             );
-            setProcessosLocal(updatedProcessos);
             versionsRef.current.set(
               createdProcesso.id,
               new Date(createdProcesso.atualizadoEm),
@@ -2433,14 +2407,6 @@ export default function ProcessosSpreadsheet({
         ) {
           dataToUpdate.usuario_atribuido_id =
             processoAtualizado.usuario_atribuido_id || null;
-        } else if (field === "unidadeRemetente") {
-          if (processoAtualizado.unidadeRemetente?.id?.startsWith("temp-")) {
-            dataToUpdate.unidade_remetente =
-              processoAtualizado.unidadeRemetente?.nome;
-          } else {
-            dataToUpdate.unidade_remetente_id =
-              processoAtualizado.unidadeRemetente?.id;
-          }
         } else if (field === "unidadeDestino") {
           if (processoAtualizado.unidadeDestino?.id?.startsWith("temp-")) {
             dataToUpdate.unidade_destino =
@@ -2478,6 +2444,12 @@ export default function ProcessosSpreadsheet({
           // Atualizar versão após sucesso
           if (response.data) {
             const updatedProcesso = response.data as IProcesso;
+            // Preserva a chave estável da linha (ver getRowId) — o response
+            // do servidor não carrega `_rowKey`, então sem isso a primeira
+            // atualização depois de uma criação faria o AG-Grid recriar a
+            // linha do zero (identidade "muda" de _rowKey pro id real).
+            (updatedProcesso as any)._rowKey =
+              (processoAtualizado as any)._rowKey ?? processoAtualizado.id;
             if (
               field === "unidadeDestino" &&
               processoAtualizado.unidadeDestino
@@ -2692,8 +2664,10 @@ export default function ProcessosSpreadsheet({
     return 42;
   }, []);
 
+  // `_rowKey` (quando presente) é a chave estável que sobrevive à troca do
+  // `id` temp->real na criação — ver adicionarProcesso/onCellValueChanged.
   const getRowId = useCallback((params: any) => {
-    return params.data.id;
+    return params.data._rowKey ?? params.data.id;
   }, []);
 
   return (

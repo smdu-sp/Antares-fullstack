@@ -36,7 +36,6 @@ const COLUNAS_PADRAO_GABINETE = [
   'assunto',
   'origem',
   'interessado',
-  'unidadeRemetente',
   'unidadeDestino',
   'usuario_atribuido_nome',
   'data_recebimento',

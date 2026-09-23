@@ -37,10 +37,6 @@ export async function buscarProcessosParaExport(params: ExportParamsInput, usuar
     where.interessado = { valor: { contains: params.interessado } };
   }
 
-  if (params.unidadeRemetente) {
-    where.unidade_remetente_id = params.unidadeRemetente;
-  }
-
   if (params.unidadeDestino) {
     where.unidade_destino_id = params.unidadeDestino;
   }
@@ -122,7 +118,6 @@ export async function buscarProcessosParaExport(params: ExportParamsInput, usuar
     where,
     include: {
       interessado: true,
-      unidadeRemetente: true,
       unidadeDestino: true,
       andamentos:
         params.incluirAndamentos || params.incluirProcesso === false

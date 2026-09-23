@@ -4,9 +4,10 @@ import { buscarPorId } from './buscar-por-id';
 
 /**
  * Espelha lib/server/unidades/remover.ts, pra UnidadeGrupo — mas checa
- * unidade_remetente_id/unidade_destino_id (os únicos campos de processo que
- * apontam pra essa tabela), diferente de `unidades/remover.ts` que checa
- * usuarios.unidade_id e processos.unidade_id (o catálogo global tem outro uso).
+ * unidade_destino_id (o único campo de processo que aponta pra essa tabela,
+ * já que unidade_remetente_id foi removido — ver `origem`, texto livre),
+ * diferente de `unidades/remover.ts` que checa usuarios.unidade_id e
+ * processos.unidade_id (o catálogo global tem outro uso).
  */
 export async function remover(id: string) {
   await buscarPorId(id);
@@ -14,7 +15,7 @@ export async function remover(id: string) {
   const processosVinculados = await prisma.processo.count({
     where: {
       ativo: true,
-      OR: [{ unidade_remetente_id: id }, { unidade_destino_id: id }],
+      unidade_destino_id: id,
     },
   });
   if (processosVinculados > 0) {

@@ -37,7 +37,6 @@ export async function exportProcessosToExcel(
     { header: 'Assunto', key: 'assunto', width: 40 },
     { header: 'Origem', key: 'origem', width: 20 },
     { header: 'Interessado', key: 'interessado', width: 30 },
-    { header: 'Unidade Remetente', key: 'unidadeRemetente', width: 25 },
     { header: 'Unidade Destino', key: 'unidadeDestino', width: 25 },
     { header: 'Data Recebimento', key: 'data_recebimento', width: 18 },
     { header: 'Data Envio', key: 'data_envio_unidade', width: 18 },
@@ -61,9 +60,6 @@ export async function exportProcessosToExcel(
       assunto: processo.assunto,
       origem: processo.origem,
       interessado: processo.interessado?.valor || '',
-      unidadeRemetente: processo.unidadeRemetente
-        ? `${processo.unidadeRemetente.sigla} - ${processo.unidadeRemetente.nome}`
-        : '',
       unidadeDestino: processo.unidadeDestino
         ? `${processo.unidadeDestino.sigla} - ${processo.unidadeDestino.nome}`
         : '',

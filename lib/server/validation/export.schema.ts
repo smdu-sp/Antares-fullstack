@@ -5,7 +5,6 @@ export const exportParamsSchema = z.object({
   ids: z.array(z.string()).optional(),
   busca: z.string().optional(),
   interessado: z.string().optional(),
-  unidadeRemetente: z.string().optional(),
   unidadeDestino: z.string().optional(),
   vencendoHoje: z.boolean().optional(),
   atrasados: z.boolean().optional(),

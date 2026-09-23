@@ -32,7 +32,10 @@ function normalizarCampoColuna(coluna: string): string {
   // colIds antigos (não batiam com os field das colunas na grid — ver
   // lib/server/processos/politica-colunas.ts) preservados aqui só pra não
   // perder a ordem de quem já tinha personalizado colunas antes da correção.
-  if (coluna === "unidade_remetente") return "unidadeRemetente";
+  // unidade_remetente/unidadeRemetente foi removido (campo não usado — ver
+  // origem, que cumpre esse papel como texto livre); colIds antigos salvos
+  // como "unidade_remetente" simplesmente não terão mais correspondência,
+  // caindo fora da grid como qualquer outro colId inexistente.
   if (coluna === "unidade_destino") return "unidadeDestino";
   if (coluna === "prorrogacao") return "data_prorrogacao";
   if (coluna === "observacoes") return "resposta_final";
